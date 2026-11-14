@@ -6,10 +6,11 @@ export function point3DToLatLon(point) {
     Math.max(-1, Math.min(1, p.y))
   ) * (180 / Math.PI)
 
-  // Correct the 180° offset
+  // Longitude in the original Three.js coordinate system
   const rawLon = Math.atan2(p.z, -p.x) * (180 / Math.PI)
 
-  const lon = ((rawLon + 180) % 360 + 360) % 360 - 180
+  // Undo the 180° offset applied in latLonToVector3()
+  const lon = ((rawLon + 360) % 360) - 180
 
   return {
     lat: Number(lat.toFixed(4)),
