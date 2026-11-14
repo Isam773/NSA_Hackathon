@@ -1,0 +1,36 @@
+import io
+import pandas as pd
+
+# 1. Lire le fichier téléchargé
+with open("horizons_results_appolo11.txt", "r") as f:
+    contenu = f.read()
+
+# 2. Isoler la zone entre $$SOE et $$EOE
+debut = contenu.find("$$SOE") + len("$$SOE\n")
+fin = contenu.find("$$EOE")
+donnees_brutes = contenu[debut:fin].strip()
+
+# 3. Charger dans un DataFrame Pandas
+colonnes = [
+    "Date",
+    "Soleil_Leve",
+    "Atmosphere",
+    "Azimut",
+    "Elevation",
+    "Distance_km",
+    "Vitesse_km_s",
+    "Delai_Lumiere_min",
+    "Angle_SOT",
+    "Cote_SOT",
+    "Angle_STO",
+    "Vide",
+]
+df = pd.read_csv(io.StringIO(donnees_brutes), names=colonnes)
+
+# Nettoyer la colonne Soleil_Leve (True si '*', False sinon)
+df["Soleil_Leve"] = df["Soleil_Leve"].str.strip() == "*"
+df = df.drop(columns=["Vide"])
+
+print(df)
+print("--"*60)
+print(df.iloc[0])
