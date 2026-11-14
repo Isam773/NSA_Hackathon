@@ -15,7 +15,6 @@ def demander_parametres_mission():
     try:
       latitude = float(input("Entrez la Latitude (-90 à 90) : "))
       longitude = float(input("Entrez la Longitude (-180 à 180) : "))
-      altitude = float(input("Entrez l'Altitude en km (0 par défaut) : ") or 0)
 
       if -90 <= latitude <= 90 and -180 <= longitude <= 180:
         break
@@ -32,7 +31,7 @@ def demander_parametres_mission():
       d1 = pd.to_datetime(date_debut)
       d2 = pd.to_datetime(date_fin)
       if d2 > d1:
-        return longitude, latitude, altitude, date_debut, date_fin
+        return longitude, latitude, date_debut, date_fin
       else:
         print("Erreur : La date de fin doit être après la date de début.\n")
     except Exception:
@@ -133,6 +132,7 @@ def afficher_bilan_15_jours(df, pas_heures=6, seuil_soleil=0.0, seuil_terre=0.0)
           Releves_Soleil=("Soleil_OK", "sum"),
           Releves_Terre=("Terre_OK", "sum"),
           Releves_Simultanes=("Les_Deux_OK", "sum"),
+          Elev_Soleil_Min=("Soleil_Elevation_deg", "min"),
           Elev_Soleil_Max=("Soleil_Elevation_deg", "max"),
           Elev_Terre_Max=("Terre_Elevation_deg", "max"),
       )
@@ -169,6 +169,7 @@ def afficher_bilan_15_jours(df, pas_heures=6, seuil_soleil=0.0, seuil_terre=0.0)
       "Freq_Com_%",
       "Jours_Simultanes",
       "Freq_Simultane_%",
+      "Elev_Soleil_Min",
       "Elev_Soleil_Max",
       "Elev_Terre_Max",
   ]]
@@ -183,7 +184,7 @@ def afficher_bilan_15_jours(df, pas_heures=6, seuil_soleil=0.0, seuil_terre=0.0)
 # EXÉCUTION PRINCIPALE
 # ==============================================================================
 if __name__ == "__main__":
-  lon, lat, alt, d_debut, d_fin = demander_parametres_mission()
+  lon, lat, d_debut, d_fin = demander_parametres_mission()
 
   donnees_completes = recuperer_donnees_completes(
       lon=lon, lat=lat, alt=alt, date_debut=d_debut, date_fin=d_fin, pas="6h"
