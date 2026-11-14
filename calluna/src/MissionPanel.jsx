@@ -389,18 +389,18 @@ export default function MissionPanel({
             <div style={styles.row}>
               <label style={styles.label}>Lat :</label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={lat}
-                onChange={(e) => setLat(Number(e.target.value))}
+                onChange={(e) => setLat(e.target.value)}
                 style={styles.input}
               />
               <label style={styles.label}>Lon :</label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={lon}
-                onChange={(e) => setLon(Number(e.target.value))}
+                onChange={(e) => setLon(e.target.value)}
                 style={styles.input}
               />
             </div>
@@ -419,7 +419,7 @@ export default function MissionPanel({
             </div>
 
             <button
-              onClick={() => onSelectSite(lat, lon)}
+              onClick={() => onSelectSite(parseFloat(lat) ||0, parseFloat(lon) ||0)}
               disabled={loading}
               style={styles.runBtn}
             >

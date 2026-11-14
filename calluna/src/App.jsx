@@ -283,8 +283,9 @@ function latLonToVector3(lat, lon, radius = MOON_RADIUS) {
 }
 
 function LandingCrosshair({ lat, lon }) {
+  const groupRef = useRef()
   const { position, quaternion } = useMemo(() => {
-    const pos = latLonToVector3(lat, lon, MOON_RADIUS + 0.015)
+    const pos = latLonToVector3(lat, lon, MOON_RADIUS + 0.013)
     const normal = pos.clone().normalize()
     const quat = new THREE.Quaternion().setFromUnitVectors(
       new THREE.Vector3(0, 0, 1),
@@ -293,8 +294,18 @@ function LandingCrosshair({ lat, lon }) {
     return { position: pos, quaternion: quat }
   }, [lat, lon])
 
+  // Ajuste l'échelle à chaque frame pour garder une taille constante à l'écran
+  useFrame(({ camera }) => {
+    if (!groupRef.current) return
+    const dist = camera.position.distanceTo(position)
+    // À distance de référence 4 (vue globale), l'échelle vaut 1.
+    // Quand on zoome (dist diminue), l'échelle diminue proportionnellement.
+    const scale = dist / 2
+    groupRef.current.scale.setScalar(scale)
+  })
+
   return (
-    <group position={position} quaternion={quaternion} renderOrder={20}>
+    <group ref={groupRef} position={position} quaternion={quaternion} renderOrder={20}>
       {/* Anneau extérieur */}
       <mesh>
         <ringGeometry args={[0.035, 0.046, 32]} />
@@ -428,8 +439,8 @@ function ScaleBar({ kmPer100Px }) {
 }
 
 export default function App() {
-  const [lat, setLat] = useState(26.1322)
-  const [lon, setLon] = useState(3.6339)
+  const [lat, setLat] = useState('0')
+  const [lon, setLon] = useState('0')
   const [debut, setDebut] = useState('2026-11-14')
   const [fin, setFin] = useState('2027-02-14')
   const [loading, setLoading] = useState(false)
