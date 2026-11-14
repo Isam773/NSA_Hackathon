@@ -1,0 +1,44 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #080b12;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.app {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.header {
+  height: 75px;
+  padding: 15px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #252a35;
+  background: #0d111b;
+}
+
+.header h1 {
+  font-size: 23px;
+  letter-spacing: 5px;
+  margin: 0;
+}
+
+.header span {
+  color: #8c96a8;
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+
+.moon-container {
+  width: 100%;
+  height: calc(100vh - 75px);
+}
