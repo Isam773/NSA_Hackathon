@@ -12,7 +12,7 @@ const DEFAULT_THRESHOLDS = {
 // Profils de mission prédéfinis
 const MISSION_PROFILES = {
   artemis: {
-    label: 'Base Artémis',
+    label: 'Artemis / Heavy Lander',
     values: {
       pente_max_toleree_deg: 15.0,
       requis_soleil_pct: 65.0,
@@ -22,7 +22,7 @@ const MISSION_PROFILES = {
     },
   },
   rover: {
-    label: 'Rover Léger',
+    label: 'Light rover',
     values: {
       pente_max_toleree_deg: 20.0,
       requis_soleil_pct: 50.0,
@@ -32,7 +32,7 @@ const MISSION_PROFILES = {
     },
   },
   rtg: {
-    label: 'Survie Longue Nuit',
+    label: 'Long-term Night Survival',
     values: {
       pente_max_toleree_deg: 12.0,
       requis_soleil_pct: 35.0,
@@ -46,64 +46,64 @@ const MISSION_PROFILES = {
 // Dictionnaire pédagogique des métriques (libellés, unités, explications pour le bouton (i))
 const METRIC_INFO = {
   altitude_site_m: {
-    label: 'Altitude réelle LOLA',
+    label: 'LOLA Altitude',
     unit: 'm',
-    desc: "Élévation du terrain par rapport au rayon moyen lunaire (1 737,4 km), mesurée par l'altimètre laser LOLA (Lunar Orbiter Laser Altimeter).",
+    desc: "Elevation of the terrain at the landing site, according to LOLA topography. Negative values indicate a location below the lunar mean radius.",
   },
   pente_locale_deg: {
-    label: 'Pente locale estimée',
+    label: 'Local slope estimated',
     unit: '°',
-    desc: "Inclinaison moyenne du sol autour du point d'atterrissage. Au-delà du seuil maximal, l'atterrisseur risque de basculer au posé.",
+    desc: "Average inclination of the terrain around the landing site. Beyond the maximum threshold, the lander risks tipping over.",
   },
   horizon_max_deg: {
-    label: 'Obstacle horizon max',
+    label: 'Maximum horizon obstacle',
     unit: '°',
-    desc: 'Hauteur angulaire maximale des reliefs environnants (remparts de cratères, montagnes) qui masquent le ciel bas.',
+    desc: 'Maximum angular height of surrounding terrain features (crater rims, mountains) that block the view of the low sky.',
   },
-  perte_soleil_relief_j: {
-    label: 'Masquage Soleil (relief)',
-    unit: 'jours',
-    desc: 'Nombre de jours cumulés d’ensoleillement perdus à cause de l’ombre portée par les cratères et montagnes voisins.',
+  loss_sunlight_relief_j: {
+    label: 'Sunshade (relief)',
+    unit: 'days',
+    desc: 'Number of days of cumulative sunlight lost due to shadows cast by neighboring craters and mountains.',
   },
-  perte_terre_relief_j: {
-    label: 'Masquage Terre cumulé (relief)',
-    unit: 'jours',
-    desc: 'Nombre de jours cumulés de visibilité radio perdus à cause des reliefs bloquant la ligne de visée directe vers la Terre.',
+  loss_earthcomm_relief_j: {
+    label: 'Earth shade(relief)',
+    unit: 'days',
+    desc: 'Number of days of cumulative radio visibility lost due to surrounding terrain features blocking the direct line of sight to Earth.',
   },
   freq_soleil_moy: {
-    label: 'Ensoleillement réel',
+    label: 'Real Sun visibility',
     unit: '%',
-    desc: 'Pourcentage du temps total de la mission où le Soleil est visible au-dessus du relief local pour alimenter les panneaux solaires.',
+    desc: 'Percentage of the total mission time when the Sun is visible above the local terrain for solar panel charging.',
   },
   nuit_max_jours: {
-    label: 'Nuit / ombre continue max',
-    unit: 'jours',
-    desc: "Plus longue période consécutive sans Soleil. Si elle dépasse l'autonomie batterie/thermique, les instruments risquent le gel (-180 °C).",
+    label: 'Night duration (max)',
+    unit: 'days',
+    desc: "Longest continuous night period (Sun below -5°) during the mission window. The lander must survive this duration without solar power.",
   },
   freq_com_moy: {
-    label: 'Visibilité Terre réelle',
+    label: 'Real Earth visibility',
     unit: '%',
-    desc: 'Pourcentage du temps où la Terre est visible au-dessus de l’horizon local, permettant une liaison radio directe sans satellite relais.',
+    desc: 'Percentage of the total mission time when Earth is visible above the local horizon, allowing direct radio communication without relay satellites.',
   },
   freq_sim_moy: {
-    label: 'Simultanéité Soleil + Terre',
+    label: 'Simultaneity Sun + Earth',
     unit: '%',
-    desc: 'Pourcentage du temps où le site reçoit à la fois de l’énergie solaire ET dispose d’une liaison directe avec la Terre (opérations actives).',
+    desc: 'Percentage of the total mission time when the site receives both solar energy and direct communication with Earth (active operations).',
   },
   elev_soleil_max: {
-    label: 'Élévation max du Soleil (pic)',
+    label: 'Max Sun elevation (peak)',
     unit: '°',
-    desc: 'Hauteur angulaire maximale atteinte par le Soleil dans le ciel local durant toute la fenêtre de mission.',
+    desc: 'Maximum angular height of the Sun in the local sky during the entire mission window.',
   },
   elev_terre_max: {
-    label: 'Élévation max de la Terre (pic)',
+    label: 'Max Earth elevation (peak)',
     unit: '°',
-    desc: 'Hauteur angulaire maximale atteinte par la Terre dans le ciel local durant toute la fenêtre de mission.',
+    desc: 'Maximum angular height of Earth in the local sky during the entire mission window.',
   },
   delai_radio_moy: {
-    label: 'Latence radio moyenne',
+    label: 'Average radio latency',
     unit: 's',
-    desc: 'Temps moyen de trajet aller simple d’un signal radio à la vitesse de la lumière entre la Lune et la Terre.',
+    desc: 'Average one-way travel time of a radio signal at the speed of light between the Moon and Earth.',
   },
 }
 
@@ -149,7 +149,7 @@ function MetricItem({ metricKey, value, subValue, thresholdText, status }) {
                 borderColor: status ? '#22c55e' : '#ef4444',
               }}
             >
-              {status ? 'OUI' : 'NON'}
+              {status ? 'YES' : 'NO'}
             </span>
           )}
         </div>
@@ -163,8 +163,8 @@ function MetricItem({ metricKey, value, subValue, thresholdText, status }) {
           {status !== undefined && status !== null && (
             <div style={{ marginTop: '4px', color: status ? '#4ade80' : '#f87171', fontWeight: 'bold' }}>
               {status
-                ? '✓ Critère respecté : la valeur mesurée respecte le seuil configuré.'
-                : '✕ Critère hors limite : la valeur mesurée dépasse le seuil configuré.'}
+                ? '✓ Criteria met: the measured value is within the configured threshold.'
+                : '✕ Criteria not met: the measured value exceeds the configured threshold.'}
             </div>
           )}
         </div>
@@ -314,15 +314,14 @@ export default function MissionPanel({
 
   // Calcul du verdict global dynamique
   const failedReasons = []
-  if (atterrissageOk === false) failedReasons.push('pente trop forte')
-  if (energieOk === false) failedReasons.push('ensoleillement insuffisant')
-  if (survieNuitOk === false) failedReasons.push('nuit continue trop longue')
-  if (comOk === false) failedReasons.push('liaison Terre insuffisante')
-  if (simultaneOk === false) failedReasons.push('simultanéité insuffisante')
-
+  if (atterrissageOk === false) failedReasons.push('slope too steep')
+  if (energieOk === false) failedReasons.push('insufficient sunlight')
+  if (survieNuitOk === false) failedReasons.push('too long continuous night')
+  if (comOk === false) failedReasons.push('insufficient Earth communication')
+  if (simultaneOk === false) failedReasons.push('insufficient simultaneity')
   const isViable = diagnostic ? failedReasons.length === 0 : false
   const dynamicVerdict = isViable
-    ? 'SITE VIABLE (Tous les critères mission sont respectés)'
+    ? 'SITE VIABLE (Every mission criterion is met)'
     : `NON VIABLE (${failedReasons.join(', ')})`
 
   return (
@@ -355,7 +354,7 @@ export default function MissionPanel({
               ...(activeTab === 'analyse' ? styles.tabBtnActive : {}),
             }}
           >
-            📊 ANALYSE SITE
+            SITE ANALYSIS
           </button>
           <button
             type="button"
@@ -365,14 +364,14 @@ export default function MissionPanel({
               ...(activeTab === 'parametres' ? styles.tabBtnActive : {}),
             }}
           >
-            ⚙️ SEUILS MISSION
+            MISSION SETTINGS
           </button>
         </div>
 
         {/* ===================== ONGLET 1 : ANALYSE ===================== */}
         {activeTab === 'analyse' && (
           <>
-            <div style={styles.subHint}>Double-cliquez sur la Lune ou choisissez un site :</div>
+            <div style={styles.subHint}>Double-click on the Moon or choose a site :</div>
 
             <div style={styles.presets}>
               <button style={styles.presetBtn} onClick={() => onSelectSite(26.1322, 3.6339)}>
@@ -382,7 +381,7 @@ export default function MissionPanel({
                 Shackleton
               </button>
               <button style={styles.presetBtn} onClick={() => onSelectSite(0, 0)}>
-                Équateur (0,0)
+                Equator (0,0)
               </button>
             </div>
 
@@ -445,7 +444,7 @@ export default function MissionPanel({
               disabled={loading}
               style={styles.runBtn}
             >
-              {loading ? 'CALCUL LOLA + HORIZONS...' : 'ANALYSER CE SITE'}
+              {loading ? 'COMPUTING LOLA + HORIZONS...' : 'ANALYZE SITE'}
             </button>
 
             {diagnostic && (
@@ -464,7 +463,7 @@ export default function MissionPanel({
                 </div>
 
                 <div style={styles.helperHint}>
-                  Cliquez sur <span style={styles.inlineInfoDemo}>i</span> pour comprendre chaque paramètre.
+                  Click on <span style={styles.inlineInfoDemo}>i</span> to understand each parameter.
                 </div>
 
                 {/* 1. TOPOGRAPHIE & SÉCURITÉ D'ATTERRISSAGE */}
@@ -474,7 +473,7 @@ export default function MissionPanel({
                   <MetricItem
                     metricKey="pente_locale_deg"
                     value={donnees.pente_locale_deg}
-                    thresholdText={`Seuil mission : ≤ ${thresholds.pente_max_toleree_deg}°`}
+                    thresholdText={`Mission threshold : ≤ ${thresholds.pente_max_toleree_deg}°`}
                     status={atterrissageOk}
                   />
 
@@ -486,11 +485,11 @@ export default function MissionPanel({
                   <MetricItem
                     metricKey="horizon_max_deg"
                     value={donnees.horizon_max_deg}
-                    subValue="(cratères / reliefs)"
+                    subValue="(craters/reliefs)"
                   />
 
                   <MetricItem
-                    metricKey="perte_soleil_relief_j"
+                    metricKey="loss_sunlight_relief_j"
                     value={
                       donnees.perte_soleil_relief_j !== undefined
                         ? `-${donnees.perte_soleil_relief_j}`
@@ -498,7 +497,7 @@ export default function MissionPanel({
                     }
                     subValue={
                       donnees.perte_terre_relief_j !== undefined
-                        ? `| -${donnees.perte_terre_relief_j} j Terre`
+                        ? `| -${donnees.perte_terre_relief_j} d Earth`
                         : ''
                     }
                   />
@@ -506,7 +505,7 @@ export default function MissionPanel({
 
                 {/* 2. ÉNERGIE & SURVIE THERMIQUE */}
                 <div style={styles.sectionBox}>
-                  <div style={styles.sectionTitle}>2. ÉNERGIE & SURVIE THERMIQUE</div>
+                  <div style={styles.sectionTitle}>2. ENERGY & THERMAL SURVIVAL</div>
 
                   <MetricItem
                     metricKey="freq_soleil_moy"
@@ -514,34 +513,34 @@ export default function MissionPanel({
                     subValue={
                       donnees.jours_soleil_total !== undefined &&
                       donnees.jours_mission_total !== undefined
-                        ? `(${donnees.jours_soleil_total}j / ${donnees.jours_mission_total}j)`
+                        ? `(${donnees.jours_soleil_total}d / ${donnees.jours_mission_total}d)`
                         : ''
                     }
-                    thresholdText={`Seuil mission : ≥ ${thresholds.requis_soleil_pct}%`}
+                    thresholdText={`Mission threshold : ≥ ${thresholds.requis_soleil_pct}%`}
                     status={energieOk}
                   />
 
                   <MetricItem
-                    metricKey="nuit_max_jours"
-                    value={donnees.nuit_max_jours}
-                    thresholdText={`Autonomie batterie : ≤ ${thresholds.autonomie_nuit_max_jours} jours`}
+                    metricKey="night_max_days"
+                    value={donnees.night_max_days}
+                    thresholdText={`Battery autonomy : ≤ ${thresholds.autonomie_nuit_max_jours} days`}
                     status={survieNuitOk}
                   />
                 </div>
 
                 {/* 3. LIAISON RADIO DIRECTE TERRE & SIMULTANÉITÉ */}
                 <div style={styles.sectionBox}>
-                  <div style={styles.sectionTitle}>3. LIAISON TERRE & SIMULTANÉITÉ</div>
+                  <div style={styles.sectionTitle}>3. DIRECT EARTH RADIO COMMUNICATION & SIMULTANEITY</div>
 
                   <MetricItem
                     metricKey="freq_com_moy"
                     value={donnees.freq_com_moy}
                     subValue={
                       donnees.jours_com_total !== undefined
-                        ? `(${donnees.jours_com_total}j cumulés)`
+                        ? `(${donnees.jours_com_total}d cumulated)`
                         : ''
                     }
-                    thresholdText={`Seuil mission : ≥ ${thresholds.requis_com_pct}%`}
+                    thresholdText={`Mission threshold : ≥ ${thresholds.requis_com_pct}%`}
                     status={comOk}
                   />
 
@@ -550,17 +549,17 @@ export default function MissionPanel({
                     value={donnees.freq_sim_moy}
                     subValue={
                       donnees.jours_sim_total !== undefined
-                        ? `(${donnees.jours_sim_total}j cumulés)`
+                        ? `(${donnees.jours_sim_total}d cumulated)`
                         : ''
                     }
-                    thresholdText={`Seuil mission : ≥ ${thresholds.requis_sim_pct}%`}
+                    thresholdText={`Mission threshold : ≥ ${thresholds.requis_sim_pct}%`}
                     status={simultaneOk}
                   />
 
                   <MetricItem
                     metricKey="delai_radio_moy"
                     value={donnees.delai_radio_moy}
-                    subValue="(aller simple)"
+                    subValue="(single trip)"
                   />
                 </div>
 
@@ -570,18 +569,18 @@ export default function MissionPanel({
                   style={styles.moreBtn}
                 >
                   {showAllDetails
-                    ? '▲ Masquer les paramètres astronomiques complémentaires'
-                    : '▼ Afficher les élévations max & détails complémentaires'}
+                    ? '▲ Hide additional astronomical parameters'
+                    : '▼ Show additional astronomical parameters'}
                 </button>
 
                 {showAllDetails && (
                   <div style={styles.sectionBox}>
-                    <div style={styles.sectionTitle}>PARAMÈTRES COMPLÉMENTAIRES</div>
+                    <div style={styles.sectionTitle}>COMPLEMENTARY ASTRONOMICAL PARAMETERS</div>
                     <MetricItem metricKey="elev_soleil_max" value={donnees.elev_soleil_max} />
                     <MetricItem metricKey="elev_terre_max" value={donnees.elev_terre_max} />
                     <MetricItem
-                      metricKey="perte_terre_relief_j"
-                      value={donnees.perte_terre_relief_j}
+                      metricKey="loss_earthcomm_relief_j"
+                      value={donnees.loss_earthcomm_relief_j}
                     />
                   </div>
                 )}
@@ -594,13 +593,13 @@ export default function MissionPanel({
         {activeTab === 'parametres' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: '24px' }}>
             <div style={styles.subHint}>
-              Ajustez les contraintes techniques de votre atterrisseur. Le diagnostic du site se met à jour en direct.
+              Adjust the mission thresholds to evaluate the viability of a landing site. The results will update in real-time in the "Site Analysis" tab.
             </div>
 
             {/* Profils prédéfinis */}
             <div>
               <div style={{ fontSize: '10.5px', color: '#94a3b8', marginBottom: '6px' }}>
-                PROFILS DE MISSION PRÉDÉFINIS :
+                PREDEFINED MISSION PROFILES:
               </div>
               <div style={styles.presets}>
                 {Object.entries(MISSION_PROFILES).map(([key, prof]) => (
@@ -617,58 +616,58 @@ export default function MissionPanel({
             </div>
 
             <ThresholdControl
-              label="Pente maximale tolérée"
+              label="Maximum tolerable slope"
               unit="°"
               min={1}
               max={45}
               step={0.5}
               value={thresholds.pente_max_toleree_deg}
               onChange={(val) => updateThreshold('pente_max_toleree_deg', val)}
-              hint="Inclinaison maximale du terrain supportée par les pieds de l'atterrisseur."
+              hint="Maximum slope the lander can tolerate."
             />
 
             <ThresholdControl
-              label="Ensoleillement minimal requis"
+              label="Minimum sunlight exposure"
               unit="%"
               min={0}
               max={100}
               step={1}
               value={thresholds.requis_soleil_pct}
               onChange={(val) => updateThreshold('requis_soleil_pct', val)}
-              hint="Part minimale de la mission exposée au Soleil pour recharger les systèmes."
+              hint="Minimum sunlight exposure required for the mission."
             />
 
             <ThresholdControl
-              label="Autonomie nuit continue"
-              unit="jours"
+              label="Continuous night autonomy"
+              unit="days"
               min={0.5}
               max={20}
               step={0.5}
               value={thresholds.autonomie_nuit_max_jours}
               onChange={(val) => updateThreshold('autonomie_nuit_max_jours', val)}
-              hint="Durée maximale de survie sans Soleil (batteries + chauffage thermique)."
+              hint="Maximum duration of survival without sunlight (batteries + thermal heating)."
             />
 
             <ThresholdControl
-              label="Visibilité Terre minimale"
+              label="Minimum Earth visibility"
               unit="%"
               min={0}
               max={100}
               step={1}
               value={thresholds.requis_com_pct}
               onChange={(val) => updateThreshold('requis_com_pct', val)}
-              hint="Temps minimal de liaison radio directe disponible avec la Terre."
+              hint="Minimum time of direct radio link available with Earth."
             />
 
             <ThresholdControl
-              label="Simultanéité Soleil + Terre"
+              label="Minimum simultaneous Sun + Earth"
               unit="%"
               min={0}
               max={100}
               step={1}
               value={thresholds.requis_sim_pct}
               onChange={(val) => updateThreshold('requis_sim_pct', val)}
-              hint="Temps minimal avec énergie solaire ET communication directe simultanées."
+              hint="Minimum time with solar energy AND direct communication available simultaneously."
             />
 
             <button
@@ -676,7 +675,7 @@ export default function MissionPanel({
               onClick={() => setThresholds(DEFAULT_THRESHOLDS)}
               style={styles.resetBtn}
             >
-              ↺ Réinitialiser les valeurs par défaut
+              ↺ Reset to default thresholds
             </button>
 
             <button
@@ -684,7 +683,7 @@ export default function MissionPanel({
               onClick={() => setActiveTab('analyse')}
               style={styles.runBtn}
             >
-              VOIR LE RÉSULTAT SUR LE SITE →
+              VIEW THE RESULTS ON THE SITE →
             </button>
           </div>
         )}
@@ -694,7 +693,7 @@ export default function MissionPanel({
       <button
         onClick={() => setIsOpen(!isOpen)}
         style={styles.toggleTab}
-        title={isOpen ? 'Réduire le panneau' : 'Ouvrir le panneau mission'}
+        title={isOpen ? 'Reduce the panel' : 'Open the mission panel'}
       >
         {isOpen ? '◀' : '▶ MISSION'}
       </button>
