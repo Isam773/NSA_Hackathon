@@ -21,15 +21,51 @@ function Moon() {
   )
 }
 
+function TestTile() {
+  const texture = useLoader(
+    TextureLoader,
+    '/textures/test-tile.jpg'
+  )
+
+  const zoom = 3
+  const row = 3
+  const col = 4
+
+  const columns = 2 ** (zoom + 1)
+  const rows = 2 ** zoom
+
+  const phiStart = (col / columns) * Math.PI * 2
+  const phiLength = (1 / columns) * Math.PI * 2
+
+  const thetaStart = (row / rows) * Math.PI
+  const thetaLength = (1 / rows) * Math.PI
+
+  return (
+    <mesh>
+      <sphereGeometry
+        args={[
+          2.003,
+          32,
+          32,
+          phiStart,
+          phiLength,
+          thetaStart,
+          thetaLength
+        ]}
+      />
+      <meshStandardMaterial
+        map={texture}
+        roughness={1}
+      />
+    </mesh>
+  )
+}
+
 function Scene() {
   return (
     <>
       <ambientLight intensity={1.2} />
-
-      <directionalLight
-        position={[5, 3, 5]}
-        intensity={2}
-      />
+      <directionalLight position={[5, 3, 5]} intensity={2} />
 
       <Stars
         radius={100}
@@ -41,6 +77,7 @@ function Scene() {
       />
 
       <Moon />
+      <TestTile />
 
       <OrbitControls
         enablePan={true}
@@ -52,7 +89,7 @@ function Scene() {
   )
 }
 
-function App() {
+export default function App() {
   return (
     <div className="app">
       <header className="header">
@@ -60,13 +97,11 @@ function App() {
         <span>LUNAR NAVIGATION SYSTEM</span>
       </header>
 
-      <main className="moon-container">
-        <Canvas camera={{ position: [0, 0, 7], fov: 45 }}>
+      <div className="moon-container">
+        <Canvas camera={{ position: [0, 0, 6] }}>
           <Scene />
         </Canvas>
-      </main>
+      </div>
     </div>
   )
 }
-
-export default App
