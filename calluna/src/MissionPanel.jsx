@@ -389,37 +389,59 @@ export default function MissionPanel({
             <div style={styles.row}>
               <label style={styles.label}>Lat :</label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={lat}
-                onChange={(e) => setLat(Number(e.target.value))}
+                onChange={(e) => setLat(e.target.value)}
                 style={styles.input}
               />
               <label style={styles.label}>Lon :</label>
               <input
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={lon}
-                onChange={(e) => setLon(Number(e.target.value))}
+                onChange={(e) => setLon(e.target.value)}
                 style={styles.input}
               />
             </div>
 
-            <div style={styles.row}>
-              <FrenchDateInput
-                value={debut}
-                onChange={setDebut}
-                style={styles.dateInput}
-             />
-            <FrenchDateInput
-                value={fin}
-                onChange={setFin}
-                style={styles.dateInput}
-            />
+            <div style={{ marginTop: '10px' }}>
+                <div
+                    style={{
+                    fontSize: '10px',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: '#94a3b8',
+                    marginBottom: '6px',
+                    fontWeight: 600,
+                    }}
+                >
+                    Mission Dates
+                </div>
+
+                <div style={styles.row}>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#cbd5e1' }}>Launch</span>
+                    <FrenchDateInput
+                        value={debut}
+                        onChange={setDebut}
+                        style={styles.dateInput}
+                    />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#cbd5e1' }}>Return</span>
+                    <FrenchDateInput
+                        value={fin}
+                        onChange={setFin}
+                        style={styles.dateInput}
+                    />
+                    </div>
+                </div>
             </div>
 
             <button
-              onClick={() => onSelectSite(lat, lon)}
+              onClick={() => onSelectSite(parseFloat(lat) ||0, parseFloat(lon) ||0)}
               disabled={loading}
               style={styles.runBtn}
             >
