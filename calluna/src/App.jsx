@@ -1,5 +1,5 @@
 
-import { Suspense, useMemo, useState } from 'react'
+import { Suspense, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
 import {
@@ -7,7 +7,8 @@ import {
   Vector3,
   BufferGeometry,
   Float32BufferAttribute,
-  DoubleSide
+  DoubleSide,
+  RepeatWrapping
 } from 'three'
 import './App.css'
 import { point3DToLatLon, fetchMissionAnalysis } from './missionApi'
@@ -16,6 +17,8 @@ import HorizonSkyplot from './HorizonSkyplot'
 import { useRef } from 'react'
 import { computeSunPosition3D } from './missionApi'
 import * as THREE from 'three'
+import PolarCap from './components/PolarCap'
+import DynamicPolarTiles from './components/DynamicPolarTiles'
 
 const MOON_RADIUS = 2
 
@@ -31,130 +34,13 @@ function Moon() {
     '/textures/moon-global.jpg'
   )
 
+  texture.wrapS = RepeatWrapping
+  texture.needsUpdate = true
+
   return (
     <mesh>
       <sphereGeometry args={[MOON_RADIUS, 128, 128]} />
       <meshStandardMaterial map={texture} roughness={1} />
-    </mesh>
-  )
-}
-
-const LUNAR_RADIUS_METERS = 1737400
-
-function SouthPole() {
-  const texture = useLoader(
-    TextureLoader,
-    '/textures/moon-south-pole.png'
-  )
-
-  const geometry = useMemo(() => {
-    const positions = []
-    const uvs = []
-    const indices = []
-
-    const latitudeSegments = 80
-    const longitudeSegments = 160
-
-    // Covers the south pole down to latitude -60°
-    const maxPolarAngle = Math.PI / 6
-
-    // NASA's level-2 WMTS grid
-    const mapWidth = 2048
-    const mapHeight = 1024
-
-    const topLeftX = -1095930
-    const topLeftY = 1095930
-
-    // Ground resolution from WMTS scale denominator
-    const scaleDenominator = 7644601.004464275
-    const metersPerPixel = scaleDenominator * 0.00028
-
-    for (let i = 0; i <= latitudeSegments; i++) {
-      const polarAngle =
-        (i / latitudeSegments) * maxPolarAngle
-
-      const latitude =
-        -Math.PI / 2 + polarAngle
-
-      // South-polar stereographic radius
-      const rho =
-        2 * LUNAR_RADIUS_METERS *
-        Math.tan(polarAngle / 2)
-
-      for (let j = 0; j <= longitudeSegments; j++) {
-        const longitude =
-          (j / longitudeSegments) * Math.PI * 2
-
-        const radius = 2.012
-
-        // Same sphere orientation as our global Moon
-        const x =
-          -radius * Math.cos(latitude) *
-          Math.cos(longitude)
-
-        const y =
-          radius * Math.sin(latitude)
-
-        const z =
-          radius * Math.cos(latitude) *
-          Math.sin(longitude)
-
-        positions.push(x, y, z)
-
-        // South-polar stereographic projection
-        const projectedX = rho * Math.sin(longitude)
-        const projectedY = -rho * Math.cos(longitude)
-
-        const pixelX =
-          (projectedX - topLeftX) / metersPerPixel
-
-        const pixelY =
-          (topLeftY - projectedY) / metersPerPixel
-
-        const u = pixelX / mapWidth
-        const v = 1 - pixelY / mapHeight
-
-        uvs.push(u, v)
-      }
-    }
-
-    for (let i = 0; i < latitudeSegments; i++) {
-      for (let j = 0; j < longitudeSegments; j++) {
-        const a = i * (longitudeSegments + 1) + j
-        const b = a + longitudeSegments + 1
-
-        indices.push(a, b, a + 1)
-        indices.push(b, b + 1, a + 1)
-      }
-    }
-
-    const result = new BufferGeometry()
-
-    result.setAttribute(
-      'position',
-      new Float32BufferAttribute(positions, 3)
-    )
-
-    result.setAttribute(
-      'uv',
-      new Float32BufferAttribute(uvs, 2)
-    )
-
-    result.setIndex(indices)
-    result.computeVertexNormals()
-
-    return result
-  }, [])
-
-  return (
-    <mesh geometry={geometry}>
-      <meshStandardMaterial
-        map={texture}
-        roughness={1}
-        side={DoubleSide}
-        transparent={true}
-        depthWrite={true}
-      />
     </mesh>
   )
 }
@@ -204,20 +90,36 @@ function tileDirection(zoom, row, col) {
 }
 
 // Find tiles near the visible side of the Moon
-function selectTiles(zoom, cameraDirection, distance) {
+
+function selectTiles(zoom, cameraDirection, distance, cameraFov, aspect) {
   const columns = 2 ** (zoom + 1)
   const rows = 2 ** zoom
 
-  // Angular radius of the visible lunar surface
   const horizonAngle = Math.acos(
     Math.min(1, MOON_RADIUS / distance)
   )
 
-  // Allow for tiles that cross the visible boundary
+  const verticalFov = cameraFov * Math.PI / 180
+
+  const horizontalFov =
+    2 * Math.atan(Math.tan(verticalFov / 2) * aspect)
+
+  const viewAngle = Math.max(verticalFov, horizontalFov) / 2
+
   const tileMargin = Math.hypot(
     Math.PI / columns,
     Math.PI / (2 * rows)
   )
+
+  // Preload a small additional area around the visible region
+  const prefetchMargin = 5 * Math.PI / 180
+
+  const maxAngle = Math.min(
+    horizonAngle,
+    viewAngle + Math.asin(
+      Math.min(1, MOON_RADIUS / distance)
+    )
+  ) + tileMargin
 
   const candidates = []
 
@@ -226,29 +128,26 @@ function selectTiles(zoom, cameraDirection, distance) {
       const direction = tileDirection(zoom, row, col)
 
       const angle = Math.acos(
-        Math.max(
-          -1,
-          Math.min(1, direction.dot(cameraDirection))
-        )
+        Math.max(-1, Math.min(1, direction.dot(cameraDirection)))
       )
 
-      if (angle <= horizonAngle + tileMargin) {
+      if (angle <= maxAngle + prefetchMargin) {
         candidates.push({ row, col, angle })
       }
     }
   }
 
-  // Limit simultaneous regional tile requests
   candidates.sort((a, b) => a.angle - b.angle)
 
   return candidates.slice(0, 48)
 }
 
+
 // Draw one complete resolution layer
-function TileLayer({ zoom, direction, distance }) {
+function TileLayer({ zoom, direction, distance, fov, aspect }) {
   const tiles = useMemo(
-    () => selectTiles(zoom, direction, distance),
-    [zoom, direction, distance]
+    () => selectTiles(zoom, direction, distance, fov, aspect),
+    [zoom, direction, distance, fov, aspect]
   )
 
   return (
@@ -279,16 +178,28 @@ function getZoomLevel(distance) {
 }
 
 function DynamicTiles() {
+  const updateTimer = useRef(0)
+
   const [view, setView] = useState({
     direction: new Vector3(0, 0, 1),
     distance: 6,
     zoom: 2,
     col: -1,
-    row: -1
+    row: -1,
+    fov: 50,
+    aspect: 1
   })
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera }, delta) => {
+    updateTimer.current += delta
+
+    // Update tile selection approximately 7 times per second
+    if (updateTimer.current < 0.15) return
+
+    updateTimer.current = 0
     const distance = camera.position.length()
+    const fov = camera.fov
+    const aspect = camera.aspect
     const direction = camera.position.clone().normalize()
     const zoom = getZoomLevel(distance)
 
@@ -309,7 +220,9 @@ function DynamicTiles() {
       if (
         previous.zoom === zoom &&
         previous.col === col &&
-        previous.row === row
+        previous.row === row &&
+        previous.fov === fov &&
+        previous.aspect === aspect
       ) {
         return previous
       }
@@ -319,7 +232,9 @@ function DynamicTiles() {
         distance,
         zoom,
         col,
-        row
+        row,
+        fov,
+        aspect
       }
     })
   })
@@ -331,6 +246,8 @@ function DynamicTiles() {
           zoom={3}
           direction={view.direction}
           distance={view.distance}
+          fov={view.fov}
+          aspect={view.aspect}
         />
       )}
 
@@ -339,6 +256,8 @@ function DynamicTiles() {
           zoom={4}
           direction={view.direction}
           distance={view.distance}
+          fov={view.fov}
+          aspect={view.aspect}
         />
       )}
 
@@ -347,6 +266,8 @@ function DynamicTiles() {
           zoom={5}
           direction={view.direction}
           distance={view.distance}
+          fov={view.fov}
+          aspect={view.aspect}
         />
       )}
     </group>
@@ -466,7 +387,9 @@ function Scene({ onSelectCoords, sunPosition, onScaleChange, lat, lon }) {
 
       <Moon />
       <DynamicTiles />
-      <SouthPole />
+      <PolarCap north={false} />
+      <PolarCap north={true} />
+      <DynamicPolarTiles />
       <LandingCrosshair lat={lat} lon={lon} />
 
       <AdaptiveControls onScaleChange={onScaleChange} />
