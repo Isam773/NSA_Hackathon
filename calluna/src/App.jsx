@@ -1,24 +1,20 @@
 
-import { Suspense, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame, useLoader } from '@react-three/fiber'
-import { OrbitControls, Stars } from '@react-three/drei'
+import { Suspense, useMemo, useRef, useState, useEffect } from 'react'
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
 import {
   TextureLoader,
   Vector3,
-  BufferGeometry,
-  Float32BufferAttribute,
-  DoubleSide,
   RepeatWrapping
 } from 'three'
 import './App.css'
-import { point3DToLatLon, fetchMissionAnalysis } from './missionApi'
+import { point3DToLatLon, fetchMissionAnalysis, computeSunPosition3D } from './missionApi'
 import MissionPanel from './MissionPanel'
 import HorizonSkyplot from './HorizonSkyplot'
-import { useRef } from 'react'
-import { computeSunPosition3D } from './missionApi'
 import * as THREE from 'three'
 import PolarCap from './components/PolarCap'
 import DynamicPolarTiles from './components/DynamicPolarTiles'
+import { Stars } from '@react-three/drei'
 
 const MOON_RADIUS = 2
 
@@ -41,7 +37,7 @@ function Moon() {
     <mesh>
       <sphereGeometry args={[MOON_RADIUS, 128, 128]} />
       <meshStandardMaterial map={texture} roughness={1} />
-    </mesh>
+    </mesh> 
   )
 }
 
@@ -274,125 +270,120 @@ function DynamicTiles() {
   )
 }
 
-function AdaptiveControls({ onScaleChange }) {
-  const controlsRef = useRef()
+// Convertit (lat, lon) en position 3D sur la sphère lunaire
+function latLonToVector3(lat, lon, radius = MOON_RADIUS) {
+  const latRad = (Number(lat) * Math.PI) / 180
+  const lonRad = (Number(lon) * Math.PI) / 180
 
-  useFrame(({ camera, size }) => {
+  const nx = -Math.cos(latRad) * Math.cos(lonRad)
+  const ny = Math.sin(latRad)
+  const nz = Math.cos(latRad) * Math.sin(lonRad)
+
+  return new THREE.Vector3(nx, ny, nz).normalize().multiplyScalar(radius)
+}
+
+function LandingCrosshair({ lat, lon }) {
+  const { position, quaternion } = useMemo(() => {
+    const pos = latLonToVector3(lat, lon, MOON_RADIUS + 0.015)
+    const normal = pos.clone().normalize()
+    const quat = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      normal
+    )
+    return { position: pos, quaternion: quat }
+  }, [lat, lon])
+
+  return (
+    <group position={position} quaternion={quaternion} renderOrder={20}>
+      {/* Anneau extérieur */}
+      <mesh>
+        <ringGeometry args={[0.035, 0.046, 32]} />
+        <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} depthTest={false} />
+      </mesh>
+      {/* Barre horizontale */}
+      <mesh>
+        <planeGeometry args={[0.12, 0.008]} />
+        <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} />
+      </mesh>
+      {/* Barre verticale */}
+      <mesh>
+        <planeGeometry args={[0.008, 0.12]} />
+        <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} />
+      </mesh>
+    </group>
+  )
+}
+
+function AdaptiveControls({ onScaleChange, lat, lon }) {
+  const controlsRef = useRef()
+  const { camera } = useThree()
+  const targetCamPos = useRef(null)
+
+  // Déclenche un recentrage caméra à chaque changement de coordonnées (lat, lon)
+  useEffect(() => {
+    if (lat === undefined || lon === undefined || isNaN(lat) || isNaN(lon)) return
+    const currentDist = camera.position.length() || 6
+    const dir = latLonToVector3(lat, lon, 1).normalize()
+    targetCamPos.current = dir.multiplyScalar(currentDist)
+  }, [lat, lon, camera])
+
+  useFrame(() => {
     if (!controlsRef.current) return
 
-    const distance = camera.position.length()
-    const altitude = Math.max(0.05, distance - MOON_RADIUS)
+    // Animation fluide vers les nouvelles coordonnées
+    if (targetCamPos.current) {
+      camera.position.lerp(targetCamPos.current, 0.08)
+      controlsRef.current.target.lerp(new THREE.Vector3(0, 0, 0), 0.1)
 
-    // Vitesse de rotation adaptative
-    controlsRef.current.rotateSpeed = Math.min(0.85, Math.max(0.08, altitude * 0.14))
-
-    // Calcul de l'échelle réelle au niveau de la surface (1 unité 3D = 868.7 km)
-    if (onScaleChange) {
-      const fovRad = (camera.fov * Math.PI) / 180
-      const worldHeightAtSurface = 2 * altitude * Math.tan(fovRad / 2)
-      const kmPerPixel = (worldHeightAtSurface * 868.7) / size.height
-      onScaleChange(kmPerPixel * 100)
+      // Arrête le pilotage auto dès que la caméra est centrée (laisse l'utilisateur libre)
+      if (camera.position.distanceTo(targetCamPos.current) < 0.02) {
+        camera.position.copy(targetCamPos.current)
+        targetCamPos.current = null
+      }
     }
+
+    const dist = camera.position.distanceTo(controlsRef.current.target)
+    const surfDist = Math.max(dist - MOON_RADIUS, 0.01)
+    controlsRef.current.rotateSpeed = Math.min(0.8, Math.max(0.03, surfDist * 0.25))
+    controlsRef.current.zoomSpeed = Math.min(1.0, Math.max(0.15, surfDist * 0.4))
+
+    if (onScaleChange) {
+      const km = ((surfDist * 1737.4) / MOON_RADIUS) * 0.14
+      onScaleChange(km)
+    }
+
+    controlsRef.current.update()
   })
 
   return (
     <OrbitControls
       ref={controlsRef}
       enablePan={false}
-      enableZoom={true}
-      zoomSpeed={0.8}
-      minDistance={2.15}
-      maxDistance={12}
-      enableDamping={true}
+      enableDamping
       dampingFactor={0.08}
+      minDistance={MOON_RADIUS + 0.04}
+      maxDistance={12}
+      // Si l'utilisateur attrape la Lune à la souris, on annule l'animation auto
+      onStart={() => {
+        targetCamPos.current = null
+      }}
     />
   )
 }
 
-function LandingCrosshair({ lat, lon }) {
-  const { position, quaternion } = useMemo(() => {
-    const latRad = (lat * Math.PI) / 180
-    const lonRad = (lon * Math.PI) / 180
-
-    // Vecteur normal à la surface (même repère exact que point3DToLatLon)
-    const nx = -Math.cos(latRad) * Math.cos(lonRad)
-    const ny = Math.sin(latRad)
-    const nz = Math.cos(latRad) * Math.sin(lonRad)
-
-    const normal = new THREE.Vector3(nx, ny, nz).normalize()
-    // Légèrement au-dessus du rayon (2.008) pour ne pas rentrer dans le relief 3D
-    const pos = normal.clone().multiplyScalar(MOON_RADIUS + 0.008)
-
-    // Oriente le viseur pour qu'il soit parfaitement plaqué tangentiellement au sol
-    const quat = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      normal
-    )
-
-    return { position: pos, quaternion: quat }
-  }, [lat, lon])
-
-  return (
-    <group position={position} quaternion={quaternion}>
-      {/* Anneau extérieur cyan */}
-      <mesh>
-        <ringGeometry args={[0.028, 0.036, 32]} />
-        <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} />
-      </mesh>
-      {/* Barre horizontale de la croix */}
-      <mesh>
-        <planeGeometry args={[0.09, 0.006]} />
-        <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} />
-      </mesh>
-      {/* Barre verticale de la croix */}
-      <mesh>
-        <planeGeometry args={[0.006, 0.09]} />
-        <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-  )
-}
-
 function Scene({ onSelectCoords, sunPosition, onScaleChange, lat, lon }) {
+  
   return (
     <>
-      <ambientLight intensity={1.5} />
-      <directionalLight 
-        position={sunPosition || [5, 3, 5] } 
-        intensity={sunPosition ? 2.6 : 2}
-      />
-
-      <Stars
-        radius={100}
-        depth={50}
-        count={4000}
-        factor={4}
-        saturation={0}
-        fade
-      />
-
-      <group
-        onDoubleClick={(e) => {
-          e.stopPropagation()
-          console.log('1. DOUBLE-CLIC CAPTE ! Point 3D :', e.point)
-          if (onSelectCoords) {
-            const { lat, lon } = point3DToLatLon(e.point)
-            console.log('2. COORDONNEES CALCULEES :', lat, lon)
-            onSelectCoords(lat, lon)
-          } else {
-            console.log('ERREUR : onSelectCoords est vide (undefined)')
-          }
-        }}
-      />
-
-      <Moon />
+      <ambientLight intensity={1.3} />
+      <directionalLight position={sunPosition || [5, 2, 5]} intensity={2.2} />
+      <Moon onSelectCoords={onSelectCoords} />
       <DynamicTiles />
-      <PolarCap north={false} />
-      <PolarCap north={true} />
-      <DynamicPolarTiles />
+      <PolarCap /> 
+      <DynamicPolarTiles /> 
+      <Stars radius={30} depth={30} count={2000} factor={2} saturation={0} fade speed={0.5} />
       <LandingCrosshair lat={lat} lon={lon} />
-
-      <AdaptiveControls onScaleChange={onScaleChange} />
+      <AdaptiveControls onScaleChange={onScaleChange} lat={lat} lon={lon} />
     </>
   )
 }
@@ -498,7 +489,7 @@ export default function App() {
         />
       )}
       <div className="moon-container">
-        <Canvas camera={{ position: [0, 0, 6] }}>
+        <Canvas camera={{ position: [0, 0, 6], near:0.005, far:200 }}>
           <Suspense fallback={null}>
             <Scene onSelectCoords={handleSelectSite} sunPosition={sunPosition} onScaleChange={setKmPer100Px} lat={lat} lon={lon} />
           </Suspense>
