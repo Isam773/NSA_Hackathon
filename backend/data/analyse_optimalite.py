@@ -2,11 +2,11 @@ import os
 import pandas as pd
 
 # Import des deux autres modules du dossier data/
-from analyse_topographie import (
+from backend.data.analyse_topographie import (
     calculer_masque_horizon_lola,
     filtrer_visibilite_avec_relief,
 )
-from extraction_horizons import (
+from backend.data.extraction_horizons import (
     demander_parametres_mission,
     recuperer_donnees_completes,
 )
