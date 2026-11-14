@@ -16,6 +16,7 @@ import PolarCap from './components/PolarCap'
 import DynamicPolarTiles from './components/DynamicPolarTiles'
 import { Stars } from '@react-three/drei'
 import LandingCrosshair from './components/LandingCrosshair'
+import LunarCoordinates from './components/LunarCoordinates'
 
 const MOON_RADIUS = 2
 
@@ -274,7 +275,7 @@ function DynamicTiles() {
 // Convertit (lat, lon) en position 3D sur la sphère lunaire
 function latLonToVector3(lat, lon, radius = MOON_RADIUS) {
   const latRad = (Number(lat) * Math.PI) / 180
-  const lonRad = (Number(lon) * Math.PI) / 180
+  const lonRad = ((Number(lon) + 180) * Math.PI) / 180
 
   const nx = -Math.cos(latRad) * Math.cos(lonRad)
   const ny = Math.sin(latRad)
@@ -399,8 +400,8 @@ function Scene({ onSelectCoords, sunPosition, onScaleChange, lat, lon }) {
       <directionalLight position={sunPosition || [5, 2, 5]} intensity={2.2} />
       <Moon onSelectCoords={onSelectCoords} />
       <DynamicTiles />
-      <PolarCap north={true} /> 
       <PolarCap north={false} />
+      <PolarCap north={true} />
       <DynamicPolarTiles /> 
       <Stars radius={30} depth={30} count={2000} factor={2} saturation={0} fade speed={0.5} />
       <LandingCrosshair lat={lat} lon={lon} />
