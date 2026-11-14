@@ -2,11 +2,11 @@ import os
 import pandas as pd
 
 # Import des deux autres modules du dossier data/
-from backend.data.analyse_topographie import (
+from data.analyse_topographie import (
     calculer_masque_horizon_lola,
     filtrer_visibilite_avec_relief,
 )
-from backend.data.extraction_horizons import (
+from data.extraction_horizons import (
     demander_parametres_mission,
     recuperer_donnees_completes,
 )
@@ -28,7 +28,7 @@ def calculer_bilan_15_jours_avec_relief(df_brut, pas_heures=6):
   else:
         col_date = df.iloc[:, 0] if not isinstance(df.index, pd.DatetimeIndex) else df.index
 
-  df["Date_dt"] = pd.to_datetime(col_date)
+  df["Date_dt"] = pd.to_datetime(col_date, format="mixed")
   date_debut = df["Date_dt"].min()
   
   df["Bloc_15j"] = ((df["Date_dt"] - date_debut).dt.days // 15) + 1
