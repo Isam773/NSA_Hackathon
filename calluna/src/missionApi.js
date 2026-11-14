@@ -1,9 +1,15 @@
 // Convertit un point 3D cliqué sur la sphère Three.js en Latitude / Longitude lunaires
 export function point3DToLatLon(point) {
   const p = point.clone().normalize()
-  const lat = Math.asin(Math.max(-1, Math.min(1, p.y))) * (180 / Math.PI)
-  let lon = Math.atan2(p.z, -p.x) * (180 / Math.PI)
-  if (lon > 180) lon -= 360
+
+  const lat = Math.asin(
+    Math.max(-1, Math.min(1, p.y))
+  ) * (180 / Math.PI)
+
+  // Correct the 180° offset
+  const rawLon = Math.atan2(p.z, -p.x) * (180 / Math.PI)
+
+  const lon = ((rawLon + 180) % 360 + 360) % 360 - 180
 
   return {
     lat: Number(lat.toFixed(4)),
@@ -25,7 +31,7 @@ export async function fetchMissionAnalysis(lat, lon, debut, fin) {
 // à partir des coordonnées du site (lat, lon) et de l'azimut/élévation locaux du Soleil
 export function computeSunPosition3D(siteLatDeg, siteLonDeg, soleilAzDeg, soleilElDeg) {
   const lat = (siteLatDeg * Math.PI) / 180
-  const lon = (siteLonDeg * Math.PI) / 180
+  const lon = ((siteLonDeg + 180) * Math.PI) / 180
   const az = (soleilAzDeg * Math.PI) / 180
   const el = (soleilElDeg * Math.PI) / 180
 
