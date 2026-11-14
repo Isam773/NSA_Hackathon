@@ -1,0 +1,63 @@
+import io
+import pandas as pd
+import requests
+
+# 1. Configuration de la requête vers la NASA
+url = "https://ssd.jpl.nasa.gov/api/horizons.api"
+params = {
+    "format": "text",
+    "COMMAND": "'399'",  # 399 = Terre (mets '10' pour le Soleil)
+    "OBJ_DATA": "'NO'",
+    "MAKE_EPHEM": "'YES'",
+    "EPHEM_TYPE": "'OBSERVER'",
+    "CENTER": "'c@301'",  # Coordonnées personnalisées sur la Lune
+    "SITE_COORD": "'0.0,-89.9,0'",  # Longitude, Latitude, Altitude (ici pôle Sud)
+    "START_TIME": "'2026-11-14'",
+    "STOP_TIME": "'2026-12-14'",
+    "STEP_SIZE": "'12h'",  # '12h' = toutes les 12 heures (c'est tout à fait valide !)
+    "QUANTITIES": "'4,20,21,23,24'",  # <-- Apostrophe fermante ajoutée ici
+    "CSV_FORMAT": "'YES'",
+    "RANGE_UNITS": "'KM'",
+}
+
+# 2. Téléchargement automatique en arrière-plan
+print("Téléchargement des données depuis la NASA...")
+reponse = requests.get(url, params=params)
+texte_brut = reponse.text
+
+# 3. Extraction et rangement dans le tableau Pandas (df)
+debut = texte_brut.find("$$SOE") + len("$$SOE\n")
+fin = texte_brut.find("$$EOE")
+donnees_propres = texte_brut[debut:fin].strip()
+
+# Ajout des colonnes correspondant aux quantités 23 et 24
+colonnes = [
+    "Date",
+    "Soleil_Leve",
+    "Atmosphere",
+    "Azimut",
+    "Elevation",
+    "Distance_km",
+    "Vitesse_km_s",
+    "Delai_Lumiere_min",
+    "Angle_SOT",
+    "Cote_SOT",
+    "Angle_STO",
+    "Vide",
+]
+df = pd.read_csv(io.StringIO(donnees_propres), names=colonnes)
+
+# Nettoyage sécurisé avec .astype(str)
+df["Soleil_Leve"] = df["Soleil_Leve"].astype(str).str.strip() == "*"
+df = df.drop(columns=["Vide"])
+
+# =========================================================
+# 4. ACCÈS AUX DONNÉES
+# =========================================================
+
+print(df[0:10]) 
+
+print("\nÉlévation maximale de la Terre :", df["Elevation"].max(), "degrés")
+
+bons_moments = df[(df["Soleil_Leve"] == True) & (df["Elevation"] > 0)]
+print("\nNombre d'intervalles optimaux :", len(bons_moments))

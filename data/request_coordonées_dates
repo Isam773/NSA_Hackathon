@@ -1,0 +1,211 @@
+import io
+import pandas as pd
+import requests
+import os
+
+URL_HORIZONS = "https://ssd.jpl.nasa.gov/api/horizons.api"
+
+
+def demander_parametres_mission():
+  """Demande les coordonnées du site et les dates de début et de fin de mission."""
+  print("=== CONFIGURATION DE LA MISSION LUNAIRE ===")
+  print("Exemples : Pôle Sud (Lat: -89.9, Lon: 0) | Apollo 11 (Lat: 0.67, Lon: 23.47)\n")
+
+  while True:
+    try:
+      latitude = float(input("Entrez la Latitude (-90 à 90) : "))
+      longitude = float(input("Entrez la Longitude (-180 à 180) : "))
+      altitude = float(input("Entrez l'Altitude en km (0 par défaut) : ") or 0)
+
+      if -90 <= latitude <= 90 and -180 <= longitude <= 180:
+        break
+      else:
+        print("Erreur : Latitude entre -90 et 90, Longitude entre -180 et 180.\n")
+    except ValueError:
+      print("Erreur : Entrez uniquement des nombres.\n")
+
+  print("\n--- Période de la mission (Format : AAAA-MM-JJ) ---")
+  while True:
+    date_debut = input("Date de début (ex: 2026-11-14) : ").strip()
+    date_fin = input("Date de fin   (ex: 2027-02-14) : ").strip()
+    try:
+      d1 = pd.to_datetime(date_debut)
+      d2 = pd.to_datetime(date_fin)
+      if d2 > d1:
+        return longitude, latitude, altitude, date_debut, date_fin
+      else:
+        print("Erreur : La date de fin doit être après la date de début.\n")
+    except Exception:
+      print("Erreur : Format de date invalide. Utilisez AAAA-MM-JJ (ex: 2026-11-14).\n")
+
+
+def interroger_nasa_horizons(cible_id, lon, lat, alt, date_debut, date_fin, pas="6h"):
+  """Interroge l'API Horizons pour une cible donnée ('399' = Terre, '10' = Soleil)."""
+  params = {
+      "format": "text",
+      "COMMAND": f"'{cible_id}'",
+      "OBJ_DATA": "'NO'",
+      "MAKE_EPHEM": "'YES'",
+      "EPHEM_TYPE": "'OBSERVER'",
+      "CENTER": "'c@301'",
+      "SITE_COORD": f"'{lon},{lat},{alt}'",
+      "START_TIME": f"'{date_debut}'",
+      "STOP_TIME": f"'{date_fin} 23:59:59'",
+      "STEP_SIZE": f"'{pas}'",
+      "QUANTITIES": "'4,20,21'",  # 4=Az/El, 20=Distance/Vitesse, 21=Temps lumière
+      "CSV_FORMAT": "'YES'",
+      "RANGE_UNITS": "'KM'",
+  }
+
+  reponse = requests.get(URL_HORIZONS, params=params).text
+
+  if "$$SOE" not in reponse:
+    raise ValueError("La NASA n'a pas pu calculer les données pour ces paramètres.")
+
+  debut = reponse.find("$$SOE") + len("$$SOE\n")
+  fin = reponse.find("$$EOE")
+  donnees_propres = reponse[debut:fin].strip()
+
+  colonnes = [
+      "Date",
+      "Soleil_Leve",
+      "Interference",
+      "Azimut",
+      "Elevation",
+      "Distance_km",
+      "Vitesse_km_s",
+      "Delai_Lumiere_min",
+      "Vide",
+  ]
+  df = pd.read_csv(io.StringIO(donnees_propres), names=colonnes)
+  df["Date"] = df["Date"].str.strip()
+  return df
+
+
+def recuperer_donnees_completes(lon, lat, alt, date_debut, date_fin, pas="6h"):
+  """Télécharge et fusionne TOUTES les données Terre et Soleil sur la période choisie."""
+  print(f"\nTéléchargement des données Terre + Soleil ({date_debut} au {date_fin})...")
+  print("Patientez quelques secondes...")
+
+  df_terre = interroger_nasa_horizons("399", lon, lat, alt, date_debut, date_fin, pas)
+  df_soleil = interroger_nasa_horizons("10", lon, lat, alt, date_debut, date_fin, pas)
+
+  df_final = pd.DataFrame({
+      "Date": df_terre["Date"],
+      "Terre_Elevation_deg": df_terre["Elevation"],
+      "Terre_Azimut_deg": df_terre["Azimut"],
+      "Terre_Distance_km": df_terre["Distance_km"],
+      "Delai_Radio_sec": (df_terre["Delai_Lumiere_min"] * 60).round(3),
+      "Soleil_Elevation_deg": df_soleil["Elevation"],
+      "Soleil_Azimut_deg": df_soleil["Azimut"],
+  })
+
+  df_final["Datetime"] = pd.to_datetime(df_final["Date"], format="%Y-%b-%d %H:%M")
+  return df_final
+
+
+def afficher_bilan_15_jours(df, pas_heures=6, seuil_soleil=0.0, seuil_terre=0.0):
+  """Affiche l'aperçu complet puis le bilan complet (Soleil + Com Terre + Simultané) par 15 jours."""
+  # 1. Double-check des données brutes
+  print("\n=== APERÇU DES DONNÉES COMPLÈTES (5 PREMIÈRES ET 5 DERNIÈRES LIGNES) ===")
+  colonnes_verif = [
+      "Date",
+      "Terre_Elevation_deg",
+      "Terre_Azimut_deg",
+      "Delai_Radio_sec",
+      "Soleil_Elevation_deg",
+      "Soleil_Azimut_deg",
+  ]
+  print(df[colonnes_verif].head(5).to_string(index=False))
+  print("...")
+  print(df[colonnes_verif].tail(5).to_string(index=False))
+
+  # 2. Création des indicateurs factuels
+  df["Soleil_OK"] = df["Soleil_Elevation_deg"] > seuil_soleil
+  df["Terre_OK"] = df["Terre_Elevation_deg"] > seuil_terre
+  df["Les_Deux_OK"] = df["Soleil_OK"] & df["Terre_OK"]
+
+  # 3. Découpage par tranches de 15 jours ('15D')
+  bilan = (
+      df.resample("15D", on="Datetime")
+      .agg(
+          Total_Releves=("Date", "count"),
+          Releves_Soleil=("Soleil_OK", "sum"),
+          Releves_Terre=("Terre_OK", "sum"),
+          Releves_Simultanes=("Les_Deux_OK", "sum"),
+          Elev_Soleil_Max=("Soleil_Elevation_deg", "max"),
+          Elev_Terre_Max=("Terre_Elevation_deg", "max"),
+      )
+      .reset_index()
+  )
+
+  # Création des colonnes de dates lisibles
+  fin_theorique = bilan["Datetime"] + pd.Timedelta(days=14)
+  fin_reelle = df["Datetime"].max()
+  bilan["Debut_Periode"] = bilan["Datetime"].dt.strftime("%Y-%m-%d")
+  bilan["Fin_Periode"] = fin_theorique.clip(upper=fin_reelle).dt.strftime("%Y-%m-%d")
+  bilan["Jours_Analyses"] = (bilan["Total_Releves"] * pas_heures / 24).round(1)
+
+  # Calculs Soleil
+  bilan["Jours_Soleil"] = (bilan["Releves_Soleil"] * pas_heures / 24).round(1)
+  bilan["Freq_Soleil_%"] = ((bilan["Releves_Soleil"] / bilan["Total_Releves"]) * 100).round(1)
+
+  # Calculs Communication Terre
+  bilan["Jours_Com_Terre"] = (bilan["Releves_Terre"] * pas_heures / 24).round(1)
+  bilan["Freq_Com_%"] = ((bilan["Releves_Terre"] / bilan["Total_Releves"]) * 100).round(1)
+
+  # Calculs Simultanés (Soleil + Terre en même temps)
+  bilan["Jours_Simultanes"] = (bilan["Releves_Simultanes"] * pas_heures / 24).round(1)
+  bilan["Freq_Simultane_%"] = ((bilan["Releves_Simultanes"] / bilan["Total_Releves"]) * 100).round(1)
+
+  # Organisation finale des colonnes
+  tableau_bilan = bilan[[
+      "Debut_Periode",
+      "Fin_Periode",
+      "Jours_Analyses",
+      "Jours_Soleil",
+      "Freq_Soleil_%",
+      "Jours_Com_Terre",
+      "Freq_Com_%",
+      "Jours_Simultanes",
+      "Freq_Simultane_%",
+      "Elev_Soleil_Max",
+      "Elev_Terre_Max",
+  ]]
+
+  print(f"\n=== BILAN COMPLET PAR TRANCHES DE 15 JOURS (Seuils : Soleil > {seuil_soleil}°, Terre > {seuil_terre}°) ===")
+  print(tableau_bilan.to_string(index=False))
+
+  return tableau_bilan
+
+
+# ==============================================================================
+# EXÉCUTION PRINCIPALE
+# ==============================================================================
+if __name__ == "__main__":
+  lon, lat, alt, d_debut, d_fin = demander_parametres_mission()
+
+  donnees_completes = recuperer_donnees_completes(
+      lon=lon, lat=lat, alt=alt, date_debut=d_debut, date_fin=d_fin, pas="6h"
+  )
+
+  bilan_15j = afficher_bilan_15_jours(
+      donnees_completes, pas_heures=6, seuil_soleil=0.0, seuil_terre=0.0
+  )
+
+  # Création automatique du chemin vers data/logs
+  dossier_logs = os.path.join("data", "logs")
+  os.makedirs(dossier_logs, exist_ok=True)
+
+  # Sauvegarde des deux tableaux dans data/logs
+  chemin_brut = os.path.join(
+      dossier_logs, f"donnees_completes_lat{lat}_lon{lon}.csv"
+  )
+  chemin_bilan = os.path.join(dossier_logs, f"bilan_15j_lat{lat}_lon{lon}.csv")
+
+  donnees_completes.drop(
+      columns=["Datetime", "Soleil_OK", "Terre_OK", "Les_Deux_OK"]
+  ).to_csv(chemin_brut, index=False)
+  bilan_15j.to_csv(chemin_bilan, index=False)
+
+  print(f"\nFichiers CSV sauvegardés dans : {dossier_logs}")

@@ -1,0 +1,187 @@
+import io
+import pandas as pd
+import requests
+
+URL_HORIZONS = "https://ssd.jpl.nasa.gov/api/horizons.api"
+
+
+def demander_coordonnees_utilisateur():
+  """Demande à l'utilisateur d'entrer les coordonnées du site lunaire."""
+  print("=== CONFIGURATION DU SITE D'ATTERRISSAGE LUNAIRE ===")
+  print("Exemples : Pôle Sud (Lat: -89.9, Lon: 0) | Apollo 11 (Lat: 0.67, Lon: 23.47)\n")
+
+  while True:
+    try:
+      latitude = float(input("Entrez la Latitude (-90 à 90) : "))
+      longitude = float(input("Entrez la Longitude (-180 à 180) : "))
+      altitude = float(input("Entrez l'Altitude en km (ex: 0 par défaut) : ") or 0)
+
+      if -90 <= latitude <= 90 and -180 <= longitude <= 180:
+        return longitude, latitude, altitude
+      else:
+        print("Erreur : Latitude entre -90 et 90, Longitude entre -180 et 180.\n")
+    except ValueError:
+      print("Erreur : Veuillez entrer uniquement des nombres (utilisez un point pour les décimales).\n")
+
+
+def interroger_nasa_horizons(cible_id, lon, lat, alt, date_debut, date_fin, pas="6h"):
+  """Interroge l'API Horizons pour une cible donnée ('399' = Terre, '10' = Soleil)."""
+  params = {
+      "format": "text",
+      "COMMAND": f"'{cible_id}'",
+      "OBJ_DATA": "'NO'",
+      "MAKE_EPHEM": "'YES'",
+      "EPHEM_TYPE": "'OBSERVER'",
+      "CENTER": "'c@301'",
+      "SITE_COORD": f"'{lon},{lat},{alt}'",
+      "START_TIME": f"'{date_debut}'",
+      "STOP_TIME": f"'{date_fin}'",
+      "STEP_SIZE": f"'{pas}'",
+      "QUANTITIES": "'4,20,21'",
+      "CSV_FORMAT": "'YES'",
+      "RANGE_UNITS": "'KM'",
+  }
+
+  reponse = requests.get(URL_HORIZONS, params=params).text
+
+  if "$$SOE" not in reponse:
+    raise ValueError("La NASA n'a pas pu calculer les données pour ces paramètres.")
+
+  debut = reponse.find("$$SOE") + len("$$SOE\n")
+  fin = reponse.find("$$EOE")
+  donnees_propres = reponse[debut:fin].strip()
+
+  colonnes = [
+      "Date",
+      "Soleil_Leve",
+      "Interference",
+      "Azimut",
+      "Elevation",
+      "Distance_km",
+      "Vitesse_km_s",
+      "Delai_Lumiere_min",
+      "Vide",
+  ]
+  df = pd.read_csv(io.StringIO(donnees_propres), names=colonnes)
+  df["Date"] = df["Date"].str.strip()
+  return df
+
+
+def analyser_site_sur_un_an(lon, lat, alt, date_debut="2026-11-14", date_fin="2027-11-14", pas="6h"):
+  """Télécharge et fusionne les données Terre et Soleil sur 1 an."""
+  print(f"\nTéléchargement des données sur 1 an ({date_debut} au {date_fin})...")
+  print("Patientez quelques secondes...")
+
+  df_terre = interroger_nasa_horizons("399", lon, lat, alt, date_debut, date_fin, pas)
+  df_soleil = interroger_nasa_horizons("10", lon, lat, alt, date_debut, date_fin, pas)
+
+  df_final = pd.DataFrame({
+      "Date": df_terre["Date"],
+      "Terre_Elevation_deg": df_terre["Elevation"],
+      "Terre_Azimut_deg": df_terre["Azimut"],
+      "Terre_Distance_km": df_terre["Distance_km"],
+      "Delai_Radio_sec": (df_terre["Delai_Lumiere_min"] * 60).round(3),
+      "Soleil_Elevation_deg": df_soleil["Elevation"],
+      "Soleil_Azimut_deg": df_soleil["Azimut"],
+  })
+
+  # Conversion de la date au format datetime pour pouvoir grouper par mois
+  df_final["Datetime"] = pd.to_datetime(df_final["Date"], format="%Y-%b-%d %H:%M")
+  df_final["Mois"] = df_final["Datetime"].dt.to_period("M")
+
+  return df_final
+
+
+def afficher_bilan_mensuel(df, pas_heures=6, seuil_soleil=0.0, seuil_terre=0.0):
+  """Affiche un échantillon de vérification puis le bilan factuel mois par mois."""
+  # 1. Double-check des données brutes
+  print("\n=== APERÇU DES DONNÉES BRUTES (5 PREMIÈRES ET 5 DERNIÈRES LIGNES) ===")
+  colonnes_affichage = [
+      "Date",
+      "Terre_Elevation_deg",
+      "Terre_Azimut_deg",
+      "Soleil_Elevation_deg",
+      "Soleil_Azimut_deg",
+      "Delai_Radio_sec",
+  ]
+  print(df[colonnes_affichage].head(5).to_string(index=False))
+  print("...")
+  print(df[colonnes_affichage].tail(5).to_string(index=False))
+
+  # 2. Création des indicateurs factuels (True/False)
+  df["Soleil_OK"] = df["Soleil_Elevation_deg"] > seuil_soleil
+  df["Terre_OK"] = df["Terre_Elevation_deg"] > seuil_terre
+  df["Les_Deux_OK"] = df["Soleil_OK"] & df["Terre_OK"]
+
+  # 3. Regroupement par mois
+  bilan = (
+      df.groupby("Mois")
+      .agg(
+          Total_Releves=("Date", "count"),
+          Releves_Soleil=("Soleil_OK", "sum"),
+          Releves_Terre=("Terre_OK", "sum"),
+          Releves_Simultanes=("Les_Deux_OK", "sum"),
+          Elev_Soleil_Max=("Soleil_Elevation_deg", "max"),
+          Elev_Terre_Max=("Terre_Elevation_deg", "max"),
+      )
+      .reset_index()
+  )
+
+  # Calcul des jours cumulés et des fréquences (%)
+  bilan["Jours_Soleil"] = (bilan["Releves_Soleil"] * pas_heures / 24).round(1)
+  bilan["Freq_Soleil_%"] = ((bilan["Releves_Soleil"] / bilan["Total_Releves"]) * 100).round(1)
+
+  bilan["Jours_Com_Terre"] = (bilan["Releves_Terre"] * pas_heures / 24).round(1)
+  bilan["Freq_Com_%"] = ((bilan["Releves_Terre"] / bilan["Total_Releves"]) * 100).round(1)
+
+  bilan["Jours_Simultanes"] = (bilan["Releves_Simultanes"] * pas_heures / 24).round(1)
+  bilan["Freq_Simultane_%"] = ((bilan["Releves_Simultanes"] / bilan["Total_Releves"]) * 100).round(1)
+
+  # Sélection et ordre des colonnes finales
+  tableau_final = bilan[[
+      "Mois",
+      "Jours_Soleil", #nombre total de jours cumulés durant le mois où le Soleil est au-dessus du seuil choisi
+      "Freq_Soleil_%", #
+      "Jours_Com_Terre",
+      "Freq_Com_%",
+      "Jours_Simultanes", #nombre de jours cumulés durant le mois où le Soleil et la Terre sont simultanément au-dessus de leurs seuils respectifs
+      "Freq_Simultane_%",
+      "Elev_Soleil_Max", #aide à repérer si le relief environnant le site d'atterrissage peut bloquer le Soleil
+      "Elev_Terre_Max", #aide à repérer si le relief environnant le site d'atterrissage peut bloquer la Terre
+  ]]
+
+  print(f"\n=== BILAN MENSUEL FACTUEL (Seuils : Soleil > {seuil_soleil}°, Terre > {seuil_terre}°) ===")
+  print(tableau_final.to_string(index=False))
+
+  return tableau_final
+
+
+# ==============================================================================
+# EXÉCUTION PRINCIPALE
+# ==============================================================================
+if __name__ == "__main__":
+  longitude, latitude, altitude = demander_coordonnees_utilisateur()
+
+  # Téléchargement sur 1 an avec un relevé toutes les 6 heures (1460 lignes)
+  donnees_annuelles = analyser_site_sur_un_an(
+      lon=longitude,
+      lat=latitude,
+      alt=altitude,
+      date_debut="2025-01-01",
+      date_fin="2026-01-01",
+      pas="6h",
+  )
+
+  # Tu peux ajuster les seuils (ex: seuil_terre=2.0 pour tenir compte du relief)
+  bilan_mensuel = afficher_bilan_mensuel(
+      donnees_annuelles, pas_heures=6, seuil_soleil=0.0, seuil_terre=0.0
+  )
+
+  # Sauvegarde des deux tableaux en CSV
+  donnees_annuelles.drop(columns=["Datetime", "Mois"]).to_csv(
+      f"donnees_brutes_lat{latitude}_lon{longitude}.csv", index=False
+  )
+  bilan_mensuel.to_csv(
+      f"bilan_mensuel_lat{latitude}_lon{longitude}.csv", index=False
+  )
+  print("\nFichiers CSV sauvegardés (données brutes + bilan mensuel).")
