@@ -50,3 +50,14 @@ def analyser_site(lat: float, lon: float, debut: str = "2026-11-14", fin: str = 
         "horizon_360": topo["horizon_360"],
         "timeline": timeline,
     })
+
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Chemin vers le dossier dist généré par React
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "../calluna/dist"))
+
+if os.path.exists(frontend_dist):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
+else:
+    print(f"⚠️ Dossier introuvable : {frontend_dist}. Lance 'npm run build' dans calluna/")
