@@ -15,6 +15,7 @@ import * as THREE from 'three'
 import PolarCap from './components/PolarCap'
 import DynamicPolarTiles from './components/DynamicPolarTiles'
 import { Stars } from '@react-three/drei'
+import LandingCrosshair from './components/LandingCrosshair'
 
 const MOON_RADIUS = 2
 
@@ -282,48 +283,56 @@ function latLonToVector3(lat, lon, radius = MOON_RADIUS) {
   return new THREE.Vector3(nx, ny, nz).normalize().multiplyScalar(radius)
 }
 
-function LandingCrosshair({ lat, lon }) {
-  const groupRef = useRef()
-  const { position, quaternion } = useMemo(() => {
-    const pos = latLonToVector3(lat, lon, MOON_RADIUS + 0.013)
-    const normal = pos.clone().normalize()
-    const quat = new THREE.Quaternion().setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
-      normal
-    )
-    return { position: pos, quaternion: quat }
-  }, [lat, lon])
+// function LandingCrosshair({ lat, lon }) {
+//   const groupRef = useRef()
+//   const numLat = lat === '' || lat === '-' ? 0 : Number(lat)
+//   const numLon = lon === '' || lon === '-' ? 0 : Number(lon)
+//   const safeLat = isNaN(numLat) ? 0 : numLat
+//   const safeLon = isNaN(numLon) ? 0 : numLon
 
-  // Ajuste l'échelle à chaque frame pour garder une taille constante à l'écran
-  useFrame(({ camera }) => {
-    if (!groupRef.current) return
-    const dist = camera.position.distanceTo(position)
-    // À distance de référence 4 (vue globale), l'échelle vaut 1.
-    // Quand on zoome (dist diminue), l'échelle diminue proportionnellement.
-    const scale = dist / 2
-    groupRef.current.scale.setScalar(scale)
-  })
+//   const { position, quaternion } = useMemo(() => {
+//     // Placé au-dessus des couches polaires (MOON_RADIUS + 0.035)
+//     const pos = latLonToVector3(safeLat, safeLon, MOON_RADIUS + 0.035)
+//     const normal = pos.clone().normalize()
+//     const quat = new THREE.Quaternion()
+//     if (normal.z < -0.9999) {
+//       quat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
+//     } else {
+//       quat.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
+//     }
+//     return { position: pos, quaternion: quat }
+//   }, [safeLat, safeLon])
 
-  return (
-    <group ref={groupRef} position={position} quaternion={quaternion} renderOrder={20}>
-      {/* Anneau extérieur */}
-      <mesh>
-        <ringGeometry args={[0.035, 0.046, 32]} />
-        <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} depthTest={false} />
-      </mesh>
-      {/* Barre horizontale */}
-      <mesh>
-        <planeGeometry args={[0.12, 0.008]} />
-        <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} />
-      </mesh>
-      {/* Barre verticale */}
-      <mesh>
-        <planeGeometry args={[0.008, 0.12]} />
-        <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} />
-      </mesh>
-    </group>
-  )
-}
+//   useFrame(({ camera }) => {
+//     if (!groupRef.current) return
+//     const dist = camera.position.distanceTo(position)
+//     const scale = Math.max(0.005, dist / 2.2)
+//     groupRef.current.scale.setScalar(scale)
+//   })
+
+//   return (
+//     <group
+//       ref={groupRef}
+//       position={position}
+//       quaternion={quaternion}
+//       renderOrder={9999}
+//       onBeforeRender={(renderer) => renderer.clearDepth()}
+//     >
+//       <mesh raycast={() => null} frustumCulled={false}>
+//         <ringGeometry args={[0.035, 0.046, 32]} />
+//         <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} depthTest={false} depthWrite={false} />
+//       </mesh>
+//       <mesh raycast={() => null} frustumCulled={false}>
+//         <planeGeometry args={[0.12, 0.008]} />
+//         <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} depthWrite={false} />
+//       </mesh>
+//       <mesh raycast={() => null} frustumCulled={false}>
+//         <planeGeometry args={[0.008, 0.12]} />
+//         <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} depthWrite={false} />
+//       </mesh>
+//     </group>
+//   )
+// }
 
 function AdaptiveControls({ onScaleChange, lat, lon }) {
   const controlsRef = useRef()
@@ -354,7 +363,7 @@ function AdaptiveControls({ onScaleChange, lat, lon }) {
     }
 
     const dist = camera.position.distanceTo(controlsRef.current.target)
-    const surfDist = Math.max(dist - MOON_RADIUS, 0.01)
+    const surfDist = Math.max(dist - MOON_RADIUS, 0.001)
     controlsRef.current.rotateSpeed = Math.min(0.8, Math.max(0.03, surfDist * 0.25))
     controlsRef.current.zoomSpeed = Math.min(1.0, Math.max(0.15, surfDist * 0.4))
 
@@ -396,6 +405,7 @@ function Scene({ onSelectCoords, sunPosition, onScaleChange, lat, lon }) {
       <Stars radius={30} depth={30} count={2000} factor={2} saturation={0} fade speed={0.5} />
       <LandingCrosshair lat={lat} lon={lon} />
       <AdaptiveControls onScaleChange={onScaleChange} lat={lat} lon={lon} />
+      <LandingCrosshair lat={lat} lon={lon} moonRadius={MOON_RADIUS} />
     </>
   )
 }
