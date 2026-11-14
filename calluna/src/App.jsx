@@ -1,11 +1,24 @@
 
-import { Canvas, useLoader } from '@react-three/fiber'
-import { TextureLoader } from 'three'
+import { Suspense, useMemo, useState } from 'react'
+import { Canvas, useFrame, useLoader } from '@react-three/fiber'
 import { OrbitControls, Stars } from '@react-three/drei'
-import { Suspense, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import {
+  TextureLoader,
+  Vector3,
+  BufferGeometry,
+  Float32BufferAttribute,
+  DoubleSide
+} from 'three'
 import './App.css'
 
+const MOON_RADIUS = 2
+
+const NASA_URL =
+  'https://trek.nasa.gov/tiles/Moon/EQ/' +
+  'LRO_WAC_Mosaic_Global_303ppd_v02/1.0.0/' +
+  'default/default028mm'
+
+// Permanent global imagery
 function Moon() {
   const texture = useLoader(
     TextureLoader,
@@ -14,127 +27,202 @@ function Moon() {
 
   return (
     <mesh>
-      <sphereGeometry args={[2, 128, 128]} />
-      <meshStandardMaterial
-        map={texture}
-        roughness={1}
-      />
+      <sphereGeometry args={[MOON_RADIUS, 128, 128]} />
+      <meshStandardMaterial map={texture} roughness={1} />
     </mesh>
   )
 }
 
+// One regional NASA tile
+function RegionalTile({ zoom, row, col }) {
+  const columns = 2 ** (zoom + 1)
+  const rows = 2 ** zoom
 
-const TILE_ZOOM = 3
-const TILE_COLUMNS = 2 ** (TILE_ZOOM + 1)
-const TILE_ROWS = 2 ** TILE_ZOOM
-
-function RegionalTile({ row, col }) {
-  const url =
-    `https://trek.nasa.gov/tiles/Moon/EQ/` +
-    `LRO_WAC_Mosaic_Global_303ppd_v02/1.0.0/` +
-    `default/default028mm/${TILE_ZOOM}/${row}/${col}.jpg`
-
+  const url = `${NASA_URL}/${zoom}/${row}/${col}.jpg`
   const texture = useLoader(TextureLoader, url)
+
+  // Higher-resolution layers sit slightly farther out
+  const radius = MOON_RADIUS + (zoom - 2) * 0.003
 
   return (
     <mesh>
       <sphereGeometry
         args={[
-          2.003,
+          radius,
           32,
           32,
-          (col / TILE_COLUMNS) * Math.PI * 2,
-          (1 / TILE_COLUMNS) * Math.PI * 2,
-          (row / TILE_ROWS) * Math.PI,
-          (1 / TILE_ROWS) * Math.PI
+          (col / columns) * Math.PI * 2,
+          (1 / columns) * Math.PI * 2,
+          (row / rows) * Math.PI,
+          (1 / rows) * Math.PI
         ]}
       />
-      <meshStandardMaterial
-        map={texture}
-        roughness={1}
-      />
+      <meshStandardMaterial map={texture} roughness={1} />
     </mesh>
   )
 }
 
-function getCameraTile(position) {
-  // Direction from the Moon's centre toward the camera
-  const direction = position.clone().normalize()
+// Determine the centre direction of a tile
+function tileDirection(zoom, row, col) {
+  const columns = 2 ** (zoom + 1)
+  const rows = 2 ** zoom
 
-  // Three.js sphere longitude angle
-  let phi = Math.atan2(direction.z, -direction.x)
+  const phi = ((col + 0.5) / columns) * Math.PI * 2
+  const theta = ((row + 0.5) / rows) * Math.PI
 
-  if (phi < 0) {
-    phi += Math.PI * 2
-  }
-
-  // Angle measured downward from the north pole
-  const theta = Math.acos(
-    Math.max(-1, Math.min(1, direction.y))
+  return new Vector3(
+    -Math.sin(theta) * Math.cos(phi),
+    Math.cos(theta),
+    Math.sin(theta) * Math.sin(phi)
   )
-
-  const col = Math.min(
-    TILE_COLUMNS - 1,
-    Math.floor(phi / (Math.PI * 2) * TILE_COLUMNS)
-  )
-
-  const row = Math.min(
-    TILE_ROWS - 1,
-    Math.floor(theta / Math.PI * TILE_ROWS)
-  )
-
-  return { row, col }
 }
 
-function DynamicTiles() {
-  const [centerTile, setCenterTile] = useState({
-    row: 4,
-    col: 4
-  })
+// Find tiles near the visible side of the Moon
+function selectTiles(zoom, cameraDirection, distance) {
+  const columns = 2 ** (zoom + 1)
+  const rows = 2 ** zoom
 
-  useFrame(({ camera }) => {
-    const next = getCameraTile(camera.position)
+  // Angular radius of the visible lunar surface
+  const horizonAngle = Math.acos(
+    Math.min(1, MOON_RADIUS / distance)
+  )
 
-    setCenterTile(previous => {
-      if (
-        previous.row === next.row &&
-        previous.col === next.col
-      ) {
-        return previous
+  // Allow for tiles that cross the visible boundary
+  const tileMargin = Math.hypot(
+    Math.PI / columns,
+    Math.PI / (2 * rows)
+  )
+
+  const candidates = []
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < columns; col++) {
+      const direction = tileDirection(zoom, row, col)
+
+      const angle = Math.acos(
+        Math.max(
+          -1,
+          Math.min(1, direction.dot(cameraDirection))
+        )
+      )
+
+      if (angle <= horizonAngle + tileMargin) {
+        candidates.push({ row, col, angle })
       }
-
-      return next
-    })
-  })
-
-  const tiles = []
-
-  // Select a 3 × 3 neighbourhood
-  for (let rowOffset = -1; rowOffset <= 1; rowOffset++) {
-    for (let colOffset = -1; colOffset <= 1; colOffset++) {
-      const row = centerTile.row + rowOffset
-
-      // Longitude wraps around the Moon
-      const col =
-        (centerTile.col + colOffset + TILE_COLUMNS)
-        % TILE_COLUMNS
-
-      // Latitude does not wrap
-      if (row < 0 || row >= TILE_ROWS) {
-        continue
-      }
-
-      tiles.push({ row, col })
     }
   }
+
+  // Limit simultaneous regional tile requests
+  candidates.sort((a, b) => a.angle - b.angle)
+
+  return candidates.slice(0, 48)
+}
+
+// Draw one complete resolution layer
+function TileLayer({ zoom, direction, distance }) {
+  const tiles = useMemo(
+    () => selectTiles(zoom, direction, distance),
+    [zoom, direction, distance]
+  )
 
   return (
     <group>
       {tiles.map(({ row, col }) => (
-        <Suspense fallback={null} key={`${row}-${col}`}>
-          <RegionalTile row={row} col={col} />
+        <Suspense
+          key={`${zoom}-${row}-${col}`}
+          fallback={null}
+        >
+          <RegionalTile
+            zoom={zoom}
+            row={row}
+            col={col}
+          />
         </Suspense>
       ))}
+    </group>
+  )
+}
+
+// Select imagery resolution from camera distance
+function getZoomLevel(distance) {
+  if (distance < 2.8) return 5
+  if (distance < 3.6) return 4
+  if (distance < 5.2) return 3
+
+  return 2
+}
+
+function DynamicTiles() {
+  const [view, setView] = useState({
+    direction: new Vector3(0, 0, 1),
+    distance: 6,
+    zoom: 2,
+    col: -1,
+    row: -1
+  })
+
+  useFrame(({ camera }) => {
+    const distance = camera.position.length()
+    const direction = camera.position.clone().normalize()
+    const zoom = getZoomLevel(distance)
+
+    // Track camera direction using a fine angular grid
+    const phi = (
+      Math.atan2(direction.z, -direction.x) +
+      Math.PI * 2
+    ) % (Math.PI * 2)
+
+    const theta = Math.acos(
+      Math.max(-1, Math.min(1, direction.y))
+    )
+
+    const col = Math.floor(phi / (Math.PI * 2) * 128)
+    const row = Math.floor(theta / Math.PI * 64)
+
+    setView(previous => {
+      if (
+        previous.zoom === zoom &&
+        previous.col === col &&
+        previous.row === row
+      ) {
+        return previous
+      }
+
+      return {
+        direction,
+        distance,
+        zoom,
+        col,
+        row
+      }
+    })
+  })
+
+  return (
+    <group>
+      {view.zoom >= 3 && (
+        <TileLayer
+          zoom={3}
+          direction={view.direction}
+          distance={view.distance}
+        />
+      )}
+
+      {view.zoom >= 4 && (
+        <TileLayer
+          zoom={4}
+          direction={view.direction}
+          distance={view.distance}
+        />
+      )}
+
+      {view.zoom >= 5 && (
+        <TileLayer
+          zoom={5}
+          direction={view.direction}
+          distance={view.distance}
+        />
+      )}
     </group>
   )
 }
@@ -158,9 +246,9 @@ function Scene() {
       <DynamicTiles />
 
       <OrbitControls
-        enablePan={true}
+        enablePan={false}
         enableZoom={true}
-        minDistance={2.5}
+        minDistance={2.15}
         maxDistance={12}
       />
     </>
@@ -177,7 +265,9 @@ export default function App() {
 
       <div className="moon-container">
         <Canvas camera={{ position: [0, 0, 6] }}>
-          <Scene />
+          <Suspense fallback={null}>
+            <Scene />
+          </Suspense>
         </Canvas>
       </div>
     </div>
