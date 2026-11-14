@@ -96,10 +96,10 @@ const [internalIdx, setInternalIdx] = useState(0)
       {/* Statuts instantanés */}
       <div style={styles.statusRow}>
         <span style={{ color: current.soleil_ok ? "#4ade80" : "#f87171" }}>
-          ☀ {current.soleil_ok ? "VISIBLE" : "MASQUÉ"} ({current.soleil_el.toFixed(1)}°)
+          ☀ {current.soleil_ok ? "VISIBLE" : "MASKED"} ({current.soleil_el.toFixed(1)}°)
         </span>
         <span style={{ color: current.terre_ok ? "#38bdf8" : "#f87171" }}>
-          🌍 {current.terre_ok ? "LIAISON OK" : "COUPÉE"} ({current.terre_el.toFixed(1)}°)
+          🌍 {current.terre_ok ? "LIAISON OK" : "COMMUNICATION LOST"} ({current.terre_el.toFixed(1)}°)
         </span>
       </div>
 
