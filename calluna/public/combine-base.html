@@ -1,0 +1,41 @@
+
+<!DOCTYPE html>
+<html>
+<body>
+  <h2>Creating CALLUNA base texture...</h2>
+
+  <script>
+    const left = new Image()
+    const right = new Image()
+
+    let loaded = 0
+
+    function combine() {
+      loaded++
+      if (loaded !== 2) return
+
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+
+      canvas.width = left.width + right.width
+      canvas.height = Math.max(left.height, right.height)
+
+      ctx.drawImage(left, 0, 0)
+      ctx.drawImage(right, left.width, 0)
+
+      const link = document.createElement('a')
+      link.download = 'moon-base.jpg'
+      link.href = canvas.toDataURL('image/jpeg', 0.95)
+      link.click()
+
+      document.body.innerHTML = '<h2>Base texture created!</h2>'
+    }
+
+    left.onload = combine
+    right.onload = combine
+
+    left.src = '/textures/moon-left.jpg'
+    right.src = '/textures/moon-right.jpg'
+  </script>
+</body>
+</html>

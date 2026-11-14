@@ -1,0 +1,65 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CALLUNA Moon Texture</title>
+</head>
+<body>
+  <h2>Combining NASA lunar tiles...</h2>
+
+  <script>
+    const rows = 4;
+    const cols = 8;
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    const images = [];
+
+    async function combine() {
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const image = new Image();
+
+          image.src = `/textures/zoom2/${row}-${col}.jpg`;
+
+          await new Promise((resolve, reject) => {
+            image.onload = resolve;
+            image.onerror = reject;
+          });
+
+          images.push({ image, row, col });
+        }
+      }
+
+      const tileWidth = images[0].image.width;
+      const tileHeight = images[0].image.height;
+
+      canvas.width = cols * tileWidth;
+      canvas.height = rows * tileHeight;
+
+      images.forEach(({ image, row, col }) => {
+        ctx.drawImage(
+          image,
+          col * tileWidth,
+          row * tileHeight
+        );
+      });
+
+      const link = document.createElement('a');
+      link.download = 'moon-global.jpg';
+      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.click();
+
+      document.body.innerHTML =
+        '<h2>Done! Your new Moon texture has downloaded.</h2>';
+    }
+
+    combine().catch(error => {
+      document.body.innerHTML =
+        '<h2>Something went wrong loading the tiles.</h2>' +
+        '<p>' + error.message + '</p>';
+    });
+  </script>
+</body>
+</html>
