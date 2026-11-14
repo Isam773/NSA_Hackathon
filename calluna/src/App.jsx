@@ -390,7 +390,8 @@ function Scene({ onSelectCoords, sunPosition, onScaleChange, lat, lon }) {
       <directionalLight position={sunPosition || [5, 2, 5]} intensity={2.2} />
       <Moon onSelectCoords={onSelectCoords} />
       <DynamicTiles />
-      <PolarCap /> 
+      <PolarCap north={true} /> 
+      <PolarCap north={false} />
       <DynamicPolarTiles /> 
       <Stars radius={30} depth={30} count={2000} factor={2} saturation={0} fade speed={0.5} />
       <LandingCrosshair lat={lat} lon={lon} />

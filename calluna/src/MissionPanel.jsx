@@ -405,17 +405,39 @@ export default function MissionPanel({
               />
             </div>
 
-            <div style={styles.row}>
-              <FrenchDateInput
-                value={debut}
-                onChange={setDebut}
-                style={styles.dateInput}
-             />
-            <FrenchDateInput
-                value={fin}
-                onChange={setFin}
-                style={styles.dateInput}
-            />
+            <div style={{ marginTop: '10px' }}>
+                <div
+                    style={{
+                    fontSize: '10px',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: '#94a3b8',
+                    marginBottom: '6px',
+                    fontWeight: 600,
+                    }}
+                >
+                    Mission Dates
+                </div>
+
+                <div style={styles.row}>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#cbd5e1' }}>Launch</span>
+                    <FrenchDateInput
+                        value={debut}
+                        onChange={setDebut}
+                        style={styles.dateInput}
+                    />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: '#cbd5e1' }}>Return</span>
+                    <FrenchDateInput
+                        value={fin}
+                        onChange={setFin}
+                        style={styles.dateInput}
+                    />
+                    </div>
+                </div>
             </div>
 
             <button
