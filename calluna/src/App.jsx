@@ -39,9 +39,10 @@ function Moon() {
     <mesh>
       <sphereGeometry args={[MOON_RADIUS, 128, 128]} />
       <meshStandardMaterial map={texture} roughness={1} />
-    </mesh> 
+    </mesh>
   )
 }
+
 
 // One regional NASA tile
 function RegionalTile({ zoom, row, col }) {
@@ -284,57 +285,6 @@ function latLonToVector3(lat, lon, radius = MOON_RADIUS) {
   return new THREE.Vector3(nx, ny, nz).normalize().multiplyScalar(radius)
 }
 
-// function LandingCrosshair({ lat, lon }) {
-//   const groupRef = useRef()
-//   const numLat = lat === '' || lat === '-' ? 0 : Number(lat)
-//   const numLon = lon === '' || lon === '-' ? 0 : Number(lon)
-//   const safeLat = isNaN(numLat) ? 0 : numLat
-//   const safeLon = isNaN(numLon) ? 0 : numLon
-
-//   const { position, quaternion } = useMemo(() => {
-//     // Placé au-dessus des couches polaires (MOON_RADIUS + 0.035)
-//     const pos = latLonToVector3(safeLat, safeLon, MOON_RADIUS + 0.035)
-//     const normal = pos.clone().normalize()
-//     const quat = new THREE.Quaternion()
-//     if (normal.z < -0.9999) {
-//       quat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI)
-//     } else {
-//       quat.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
-//     }
-//     return { position: pos, quaternion: quat }
-//   }, [safeLat, safeLon])
-
-//   useFrame(({ camera }) => {
-//     if (!groupRef.current) return
-//     const dist = camera.position.distanceTo(position)
-//     const scale = Math.max(0.005, dist / 2.2)
-//     groupRef.current.scale.setScalar(scale)
-//   })
-
-//   return (
-//     <group
-//       ref={groupRef}
-//       position={position}
-//       quaternion={quaternion}
-//       renderOrder={9999}
-//       onBeforeRender={(renderer) => renderer.clearDepth()}
-//     >
-//       <mesh raycast={() => null} frustumCulled={false}>
-//         <ringGeometry args={[0.035, 0.046, 32]} />
-//         <meshBasicMaterial color="#38bdf8" side={THREE.DoubleSide} depthTest={false} depthWrite={false} />
-//       </mesh>
-//       <mesh raycast={() => null} frustumCulled={false}>
-//         <planeGeometry args={[0.12, 0.008]} />
-//         <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} depthWrite={false} />
-//       </mesh>
-//       <mesh raycast={() => null} frustumCulled={false}>
-//         <planeGeometry args={[0.008, 0.12]} />
-//         <meshBasicMaterial color="#ef4444" side={THREE.DoubleSide} depthTest={false} depthWrite={false} />
-//       </mesh>
-//     </group>
-//   )
-// }
-
 function AdaptiveControls({ onScaleChange, lat, lon }) {
   const controlsRef = useRef()
   const { camera } = useThree()
@@ -398,13 +348,23 @@ function Scene({ onSelectCoords, sunPosition, onScaleChange, lat, lon }) {
     <>
       <ambientLight intensity={1.3} />
       <directionalLight position={sunPosition || [5, 2, 5]} intensity={2.2} />
-      <Moon onSelectCoords={onSelectCoords} />
-      <DynamicTiles />
-      <PolarCap north={false} />
-      <PolarCap north={true} />
-      <DynamicPolarTiles /> 
+      <group
+        onDoubleClick={(event) => {
+          event.stopPropagation()
+
+          const { lat, lon } = point3DToLatLon(event.point)
+
+          console.log('Selected lunar coordinates:', lat, lon)
+          onSelectCoords(lat, lon)
+        }}
+      >
+        <Moon />
+        <DynamicTiles />
+        <PolarCap north={false} />
+        <PolarCap north={true} />
+        <DynamicPolarTiles />
+      </group>
       <Stars radius={30} depth={30} count={2000} factor={2} saturation={0} fade speed={0.5} />
-      <LandingCrosshair lat={lat} lon={lon} />
       <AdaptiveControls onScaleChange={onScaleChange} lat={lat} lon={lon} />
       <LandingCrosshair lat={lat} lon={lon} moonRadius={MOON_RADIUS} />
     </>
@@ -451,6 +411,12 @@ function ScaleBar({ kmPer100Px }) {
 }
 
 export default function App() {
+  const handleCoordinateSelection = (selectedLat, selectedLon) => {
+    setLat(selectedLat)
+    setLon(selectedLon)
+    // Clear results belonging to the previous location
+    setMissionData(null) 
+  }
   const [lat, setLat] = useState('0')
   const [lon, setLon] = useState('0')
   const [debut, setDebut] = useState('2026-11-14')
@@ -459,15 +425,31 @@ export default function App() {
   const [missionData, setMissionData] = useState(null)
   const [timeIndex, setTimeIndex] = useState(0)
   const [kmPer100Px, setKmPer100Px] = useState(500)
+  const [analysedSite, setAnalysedSite] = useState(null)
 
+  
   const handleSelectSite = async (targetLat, targetLon) => {
     setLat(targetLat)
     setLon(targetLon)
     setLoading(true)
+
     try {
-      const data = await fetchMissionAnalysis(targetLat, targetLon, debut, fin)
+      const data = await fetchMissionAnalysis(
+        targetLat,
+        targetLon,
+        debut,
+        fin
+      )
+
+      // Remember the coordinates used for this analysis
+      setAnalysedSite({
+        lat: Number(targetLat),
+        lon: Number(targetLon)
+      })
+
       setMissionData(data)
-      setTimeIndex(0) // Reset time index when new data arrives
+      setTimeIndex(0) // Reset timeline when new data arrives
+
     } catch (err) {
       console.error(err)
       alert("Vérifie que ton serveur Python uvicorn tourne sur le port 8000.")
@@ -476,11 +458,23 @@ export default function App() {
     }
   }
 
-  const sunPosition = useMemo(() => {
+
+  const [sunPosition, setSunPosition] = useState(null)
+
+  useEffect(() => {
     const point = missionData?.timeline?.[timeIndex]
-    if (!point) return null
-    return computeSunPosition3D(lat, lon, point.soleil_az, point.soleil_el)
-  }, [missionData, timeIndex, lat, lon])
+
+    if (!point || !analysedSite) return
+
+    const position = computeSunPosition3D(
+      analysedSite.lat,
+      analysedSite.lon,
+      point.soleil_az,
+      point.soleil_el
+    )
+
+    setSunPosition(position)
+  }, [missionData, timeIndex, analysedSite])
 
   console.log('DEBUG LUMIERE -> timeIndex:', timeIndex, '| sunPosition:', sunPosition)
 
@@ -514,7 +508,7 @@ export default function App() {
       <div className="moon-container">
         <Canvas camera={{ position: [0, 0, 6], near:0.005, far:200 }}>
           <Suspense fallback={null}>
-            <Scene onSelectCoords={handleSelectSite} sunPosition={sunPosition} onScaleChange={setKmPer100Px} lat={lat} lon={lon} />
+            <Scene onSelectCoords={handleCoordinateSelection} sunPosition={sunPosition} onScaleChange={setKmPer100Px} lat={lat} lon={lon} />
           </Suspense>
         </Canvas>
       </div>
