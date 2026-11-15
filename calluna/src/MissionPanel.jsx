@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 const DEFAULT_THRESHOLDS = {
   pente_max_toleree_deg: 15.0,
   requis_soleil_pct: 65.0,
-  autonomie_nuit_max_jours: 4.0,
+  autonomie_night_max_days: 4.0,
   requis_com_pct: 25.0,
   requis_sim_pct: 15.0,
 }
@@ -16,7 +16,7 @@ const MISSION_PROFILES = {
     values: {
       pente_max_toleree_deg: 15.0,
       requis_soleil_pct: 65.0,
-      autonomie_nuit_max_jours: 4.0,
+      autonomie_night_max_days: 4.0,
       requis_com_pct: 25.0,
       requis_sim_pct: 15.0,
     },
@@ -26,7 +26,7 @@ const MISSION_PROFILES = {
     values: {
       pente_max_toleree_deg: 20.0,
       requis_soleil_pct: 50.0,
-      autonomie_nuit_max_jours: 2.0,
+      autonomie_night_max_days: 2.0,
       requis_com_pct: 20.0,
       requis_sim_pct: 10.0,
     },
@@ -36,7 +36,7 @@ const MISSION_PROFILES = {
     values: {
       pente_max_toleree_deg: 12.0,
       requis_soleil_pct: 35.0,
-      autonomie_nuit_max_jours: 16.0,
+      autonomie_night_max_days: 16.0,
       requis_com_pct: 25.0,
       requis_sim_pct: 10.0,
     },
@@ -75,7 +75,7 @@ const METRIC_INFO = {
     unit: '%',
     desc: 'Percentage of the total mission time when the Sun is visible above the local terrain for solar panel charging.',
   },
-  nuit_max_jours: {
+  night_max_days: {
     label: 'Night duration (max)',
     unit: 'days',
     desc: "Longest continuous night period (Sun below -5°) during the mission window. The lander must survive this duration without solar power.",
@@ -297,9 +297,9 @@ export default function MissionPanel({
       ? donnees.freq_soleil_moy >= thresholds.requis_soleil_pct
       : criteresBackend.energie_ok
 
-  const survieNuitOk =
-    donnees.nuit_max_jours !== undefined
-      ? donnees.nuit_max_jours <= thresholds.autonomie_nuit_max_jours
+  const survieNightOk =
+    donnees.nuit_max_days !== undefined
+      ? donnees.nuit_max_days <= thresholds.autonomie_night_max_days
       : criteresBackend.survie_nuit_ok
 
   const comOk =
@@ -316,7 +316,7 @@ export default function MissionPanel({
   const failedReasons = []
   if (atterrissageOk === false) failedReasons.push('slope too steep')
   if (energieOk === false) failedReasons.push('insufficient sunlight')
-  if (survieNuitOk === false) failedReasons.push('too long continuous night')
+  if (survieNightOk === false) failedReasons.push('too long continuous night')
   if (comOk === false) failedReasons.push('insufficient Earth communication')
   if (simultaneOk === false) failedReasons.push('insufficient simultaneity')
   const isViable = diagnostic ? failedReasons.length === 0 : false
@@ -522,9 +522,9 @@ export default function MissionPanel({
 
                   <MetricItem
                     metricKey="night_max_days"
-                    value={donnees.night_max_days}
-                    thresholdText={`Battery autonomy : ≤ ${thresholds.autonomie_nuit_max_jours} days`}
-                    status={survieNuitOk}
+                    value={donnees.nuit_max_jours}
+                    thresholdText={`Battery autonomy : ≤ ${thresholds.autonomie_night_max_days} days`}
+                    status={survieNightOk}
                   />
                 </div>
 
@@ -643,8 +643,8 @@ export default function MissionPanel({
               min={0.5}
               max={20}
               step={0.5}
-              value={thresholds.autonomie_nuit_max_jours}
-              onChange={(val) => updateThreshold('autonomie_nuit_max_jours', val)}
+              value={thresholds.autonomie_night_max_days}
+              onChange={(val) => updateThreshold('autonomie_night_max_days', val)}
               hint="Maximum duration of survival without sunlight (batteries + thermal heating)."
             />
 
