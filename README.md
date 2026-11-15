@@ -77,7 +77,7 @@ Double-clicking updates the coordinates without automatically starting an analys
 
 1. Select your landing site.
 2. Choose the mission start and end dates.
-3. Click **ANALYSER CE SITE**.
+3. Click **ANALYZE SITE**.
 4. Wait for the analysis to finish.
 
 CALLUNA evaluates the selected location using terrain and astronomical data.
