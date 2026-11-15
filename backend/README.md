@@ -125,12 +125,6 @@ The main endpoint accepts lunar coordinates and mission dates.
 | `debut` | string | Mission start date, `YYYY-MM-DD` |
 | `fin` | string | Mission end date, `YYYY-MM-DD` |
 
-Example:
-
-```text
-http://127.0.0.1:8000/api/analyser?lat=0.6741&lon=23.4730&debut=2026-11-14&fin=2026-11-28
-```
-
 The backend performs the analysis and returns a JSON response.
 
 ### Response structure
@@ -444,8 +438,7 @@ The CALLUNA team directed development, integrated the modules, tested the applic
 
 - [NASA JPL Horizons](https://ssd.jpl.nasa.gov/horizons/)
 - [Horizons API](https://ssd.jpl.nasa.gov/doc/horizons.html)
-- [NASA Lunar Reconnaissance Orbiter](https://science.nasa.gov/mission/lro/)
-- [LOLA](https://lola.gsfc.nasa.gov/)
+- [LOLA PDS Data Archive](https://imbrium.mit.edu)
 - [NASA Moon Trek](https://trek.nasa.gov/moon/)
 
 CALLUNA is an independent educational and preliminary lunar mission-planning application developed for the **NASA Space Apps Challenge 2026**.

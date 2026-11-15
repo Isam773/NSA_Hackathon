@@ -113,7 +113,7 @@ CALLUNA uses data and services from NASA and associated research organisations:
 
 - [NASA Moon Trek](https://trek.nasa.gov/moon/) — Lunar imagery and mapping
 - [Lunar Reconnaissance Orbiter](https://science.nasa.gov/mission/lro/) — Lunar surface observations
-- [LOLA](https://lola.gsfc.nasa.gov/) — Lunar elevation data
+- [LOLA PDS Data Archive](https://imbrium.mit.edu) — Lunar elevation data
 - [NASA JPL Horizons](https://ssd.jpl.nasa.gov/horizons/) — Sun and Earth ephemerides
 
 **Disclaimer:** CALLUNA is intended for educational exploration and preliminary mission assessment. It is not a certified system for real lunar landing operations.

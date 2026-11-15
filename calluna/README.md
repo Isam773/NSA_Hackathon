@@ -135,13 +135,6 @@ This texture provides a complete lunar surface image while additional imagery lo
 ### Dynamic image tiles
 
 CALLUNA retrieves imagery from NASA Moon Trek using the Web Map Tile Service (WMTS).
-
-Global imagery endpoint:
-
-```text
-https://trek.nasa.gov/tiles/Moon/EQ/LRO_WAC_Mosaic_Global_303ppd_v02/1.0.0/default/default028mm/{zoom}/{row}/{col}.jpg
-```
-
 The system selects imagery according to camera distance and viewing direction.
 
 As users zoom in:
@@ -332,8 +325,6 @@ These thresholds are evaluated locally against the returned mission metrics.
 
 Changing them does not automatically rerun the backend calculations.
 
-**Known issue:** The frontend's maximum-night criterion uses `nuit_max_days`, while the backend returns `nuit_max_jours`. These names should be made consistent.
-
 ---
 
 ## 8. Backend Communication
@@ -353,12 +344,6 @@ lat   = Lunar latitude
 lon   = Lunar longitude
 debut = Mission start date
 fin   = Mission end date
-```
-
-Example:
-
-```text
-http://127.0.0.1:8000/api/analyser?lat=0.6741&lon=23.4730&debut=2026-11-14&fin=2026-11-28
 ```
 
 The response contains three principal objects:
